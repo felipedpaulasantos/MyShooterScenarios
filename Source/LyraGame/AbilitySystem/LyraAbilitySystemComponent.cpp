@@ -158,8 +158,27 @@ void ULyraAbilitySystemComponent::AbilitySpecInputPressed(FGameplayAbilitySpec& 
 	// Use replicated events instead so that the WaitInputPress ability task works.
 	if (Spec.IsActive())
 	{
-		// Invoke the InputPressed event. This is not replicated here. If someone is listening, they may replicate the InputPressed event to the server.
-		InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, Spec.ActivationInfo.GetActivationPredictionKey());
+		// For instanced abilities, we need to invoke the event on each instance
+		ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(Spec.Ability);
+		
+		if (LyraAbilityCDO->GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+		{
+			TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+			
+			for (UGameplayAbility* AbilityInstance : Instances)
+			{
+				// Get the current activation info from the instance itself
+				FGameplayAbilityActivationInfo InstanceActivationInfo = AbilityInstance->GetCurrentActivationInfo();
+				
+				// Invoke the replicated event with the instance's activation info
+				InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, InstanceActivationInfo.GetActivationPredictionKey());
+			}
+		}
+		else
+		{
+			// For non-instanced abilities, use the spec's activation info
+			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, Spec.ActivationInfo.GetActivationPredictionKey());
+		}
 	}
 }
 
@@ -171,8 +190,27 @@ void ULyraAbilitySystemComponent::AbilitySpecInputReleased(FGameplayAbilitySpec&
 	// Use replicated events instead so that the WaitInputRelease ability task works.
 	if (Spec.IsActive())
 	{
-		// Invoke the InputReleased event. This is not replicated here. If someone is listening, they may replicate the InputReleased event to the server.
-		InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, Spec.ActivationInfo.GetActivationPredictionKey());
+		// For instanced abilities, we need to invoke the event on each instance
+		ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(Spec.Ability);
+		
+		if (LyraAbilityCDO->GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+		{
+			TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+			
+			for (UGameplayAbility* AbilityInstance : Instances)
+			{
+				// Get the current activation info from the instance itself
+				FGameplayAbilityActivationInfo InstanceActivationInfo = AbilityInstance->GetCurrentActivationInfo();
+				
+				// Invoke the replicated event with the instance's activation info
+				InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, InstanceActivationInfo.GetActivationPredictionKey());
+			}
+		}
+		else
+		{
+			// For non-instanced abilities, use the spec's activation info
+			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, Spec.ActivationInfo.GetActivationPredictionKey());
+		}
 	}
 }
 
@@ -291,7 +329,7 @@ void ULyraAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGam
 				if (AbilitySpec->IsActive())
 				{
 					// Ability is active so pass along the input event.
-					AbilitySpecInputReleased(*AbilitySpec);
+ 					AbilitySpecInputReleased(*AbilitySpec);
 				}
 			}
 		}
