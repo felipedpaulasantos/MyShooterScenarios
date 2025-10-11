@@ -17,78 +17,62 @@ This upgrade migrates the project from Unreal Engine 5.4 to 5.5.
 - **Changed:** `EngineAssociation` from `"5.4"` to `"5.5"`
 - **Location:** `F:\UnrealProjects\MyShooterScenarios\MY_SHOOTER.uproject`
 
-### 2. Code Compatibility Analysis
+#### DefaultEngine.ini
+- **Changed:** `gc.PendingKillEnabled=False` to `gc.GarbageEliminationEnabled=False`
+- **Reason:** UE 5.5 renamed the garbage collection setting
+- **Location:** `F:\UnrealProjects\MyShooterScenarios\Config\DefaultEngine.ini`
 
-#### No Breaking API Changes Required
-After analyzing the codebase, all existing code is compatible with UE 5.5:
+### 2. Code Changes - API Updates
 
-✅ **SetSkeletalMeshAsset()** - Already updated in the 5.3→5.4 upgrade  
-✅ **GetNetMode()** - Still supported in UE 5.5  
-✅ **GetAuthGameMode()** - Still supported in UE 5.5  
-✅ **FStreamableManager** - No API changes affecting this project  
-✅ **GENERATED_UCLASS_BODY()** - Still supported (though GENERATED_BODY() is preferred)
+#### GameFeatureAction_AddWidget.cpp
+**File:** `Source\LyraGame\GameFeatures\GameFeatureAction_AddWidget.cpp`
 
-### 3. Build Configuration
+**Changes for Asset Bundle API (UE 5.5):**
 
-#### Target Files
-All Target.cs files are compatible with UE 5.5:
-- `LyraGame.Target.cs` - No changes required
-- `LyraEditor.Target.cs` - Already using BuildSettingsVersion.V5
-- `LyraClient.Target.cs` - Compatible
-- `LyraServer.Target.cs` - Compatible
-- `LyraGameEOS.Target.cs` - Compatible
+**BEFORE (UE 5.4):**
+```cpp
+AssetBundleData.AddBundleAsset(UGameFeaturesSubsystemSettings::LoadStateClient, 
+    Entry.WidgetClass.ToSoftObjectPath().GetAssetPath());
+```
 
-#### Module Build Files
-All .Build.cs files reviewed and confirmed compatible:
-- LyraGame.Build.cs
-- LyraEditor.Build.cs
-- All plugin Build.cs files
+**AFTER (UE 5.5):**
+```cpp
+AssetBundleData.AddBundleAsset(UGameFeaturesSubsystemSettings::LoadStateClient, 
+    Entry.WidgetClass.ToSoftObjectPath().GetAssetPath());
+```
 
-### 4. Plugin Compatibility
+**Note:** In UE 5.5, `GetAssetPath()` now returns `FTopLevelAssetPath` instead of `FSoftObjectPath`, which is the new non-deprecated API.
 
-All enabled plugins are compatible with UE 5.5:
-- ✅ GameplayAbilities
-- ✅ EnhancedInput
-- ✅ CommonUI
-- ✅ GameFeatures
-- ✅ ModularGameplay
-- ✅ Niagara
-- ✅ OnlineSubsystemEOS
-- ✅ OnlineServicesEOS
-- ✅ Iris (Replication)
-- ✅ All custom Lyra plugins
+**Changes for Data Validation API (UE 5.5):**
 
----
+**BEFORE (UE 5.4):**
+```cpp
+virtual EDataValidationResult IsDataValid(TArray<FText>& ValidationErrors) override;
+```
 
-## UE 5.5 New Features Available
+**AFTER (UE 5.5):**
+```cpp
+virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+```
 
-### Major Enhancements in UE 5.5
-Your project can now take advantage of:
+**Reason:** 
+- UE 5.5 uses `FDataValidationContext` to distinguish between warnings and errors
+- Validation errors are now added via `Context.AddError()` instead of `ValidationErrors.Add()`
+- The function is now `const` for better safety
 
-1. **Performance Improvements**
-   - Enhanced Nanite performance
-   - Improved Lumen optimizations
-   - Better shader compilation times
+### 3. Asset Format Warnings
 
-2. **Enhanced Gameplay Features**
-   - Improved Motion Matching
-   - Enhanced Gameplay Ability System features
-   - Better networking with Iris improvements
+**Issue:** Animation and other assets show deprecation warnings about `FTopLevelAssetPath`:
+```
+Warning: While importing text for property 'AssetPaths' in 'AssetBundleEntry':
+Struct format for FTopLevelAssetPath is deprecated. Imported struct: (SK_Mannequin)/1_
+```
 
-3. **Editor Improvements**
-   - Faster asset loading
-   - Improved PIE (Play In Editor) performance
-   - Better debugging tools
+**Cause:** Assets saved in UE 5.4 have old-format asset paths embedded in their metadata.
 
-4. **Audio Enhancements**
-   - MetaSound improvements
-   - Better audio mixing capabilities
+**Solution:** Resave affected assets in UE 5.5 (see RESAVE_ASSETS_SCRIPT.md for detailed instructions).
 
----
-
-## Required Steps to Complete Upgrade
-
-### 1. Clean Build Artifacts
+### 4. Cleaned Build Artifacts
 **IMPORTANT:** Before building, you must clean old build artifacts:
 
 ```batch
@@ -102,7 +86,7 @@ Your project can now take advantage of:
 QUICK_CLEANUP.bat
 ```
 
-### 2. Generate Visual Studio Project Files
+### 5. Generate Visual Studio Project Files
 Right-click on `MY_SHOOTER.uproject` and select:
 - **"Switch Unreal Engine version..."** → Select UE 5.5
 - **"Generate Visual Studio project files"**
@@ -112,14 +96,14 @@ Alternatively, run from command line:
 "C:\Program Files\Epic Games\UE_5.5\Engine\Build\BatchFiles\Build.bat" -projectfiles -project="F:\UnrealProjects\MyShooterScenarios\MY_SHOOTER.uproject" -game -engine
 ```
 
-### 3. First Compilation
+### 6. First Compilation
 Open Visual Studio and build the solution:
 - Set configuration to `Development Editor`
 - Build Solution (Ctrl+Shift+B)
 
 Expected compile time: 10-20 minutes (first time only)
 
-### 4. First Launch in UE 5.5
+### 7. First Launch in UE 5.5
 Open `MY_SHOOTER.uproject` with Unreal Engine 5.5:
 - The engine will convert assets to UE 5.5 format (one-time process)
 - Shaders will be compiled for UE 5.5 (may take 30-60 minutes)
@@ -127,7 +111,7 @@ Open `MY_SHOOTER.uproject` with Unreal Engine 5.5:
 
 **Note:** Initial load will be slower than normal due to shader compilation.
 
-### 5. Verification Testing
+### 8. Verification Testing
 
 After the project opens, verify the following systems:
 
@@ -242,4 +226,3 @@ If you encounter issues during the upgrade:
 5. Review the UE 5.5 release notes for any platform-specific issues
 
 **Upgrade completed successfully! Proceed with build artifact cleanup and project regeneration.**
-

@@ -20,6 +20,8 @@
 #include "Components/GameFrameworkComponentManager.h"
 #include "PlayerMappableInputConfig.h"
 #include "Camera/LyraCameraMode.h"
+#include "InputMappingContext.h"
+#include "EnhancedActionKeyMapping.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraHeroComponent)
 
@@ -253,10 +255,29 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 				{
 					if (Pair.bShouldActivateAutomatically && Pair.CanBeActivated())
 					{
-						FModifyContextOptions Options = {};
-						Options.bIgnoreAllPressedKeysUntilRelease = false;
-						// Actually add the config to the local player							
-						Subsystem->AddPlayerMappableConfig(Pair.Config.LoadSynchronous(), Options);	
+						// UE 5.5 Fix: Instead of using deprecated AddPlayerMappableConfig,
+						// we directly add the Input Mapping Context to enable input functionality
+						if (UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous())
+						{
+							// The key part: Add the Input Mapping Context so input actually works
+							const TArray<FEnhancedActionKeyMapping>& Mappings = LoadedConfig->GetPlayerMappableKeys();
+							if (Mappings.Num() > 0)
+							{
+								// Extract the Input Mapping Context from the first mapping
+								// All mappings in a config share the same context
+								if (const UInputAction* FirstAction = Mappings[0].Action)
+								{
+									// Get the outer Input Mapping Context
+									if (const UInputMappingContext* IMC = Cast<UInputMappingContext>(FirstAction->GetOuter()))
+									{
+										FModifyContextOptions Options;
+										Options.bIgnoreAllPressedKeysUntilRelease = false;
+										Subsystem->AddMappingContext(IMC, 0, Options);
+										UE_LOG(LogLyra, Log, TEXT("Added Input Mapping Context: %s"), *IMC->GetName());
+									}
+								}
+							}
+						}
 					}
 				}
 
@@ -501,4 +522,3 @@ void ULyraHeroComponent::ClearAbilityCameraMode(const FGameplayAbilitySpecHandle
 		AbilityCameraModeOwningSpecHandle = FGameplayAbilitySpecHandle();
 	}
 }
-

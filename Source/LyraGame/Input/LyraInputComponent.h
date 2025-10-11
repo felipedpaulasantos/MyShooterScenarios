@@ -65,7 +65,11 @@ void ULyraInputComponent::BindAbilityActions(const ULyraInputConfig* InputConfig
 
 			if (ReleasedFunc)
 			{
+				// UE 5.5 Fix: Bind to both Completed and Canceled to properly detect input release
+				// Completed fires when the action completes successfully (key released after being held)
+				// Canceled fires when the action is interrupted (e.g., focus lost, context removed)
 				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Completed, Object, ReleasedFunc, Action.InputTag).GetHandle());
+				BindHandles.Add(BindAction(Action.InputAction, ETriggerEvent::Canceled, Object, ReleasedFunc, Action.InputTag).GetHandle());
 			}
 		}
 	}

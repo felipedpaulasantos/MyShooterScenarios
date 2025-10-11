@@ -25,6 +25,12 @@ void ULyraInputComponent::AddInputMappings(const ULyraInputConfig* InputConfig, 
 	// Add any registered input mappings from the settings!
 	if (ULyraSettingsLocal* LocalSettings = ULyraSettingsLocal::Get())
 	{	
+		// NOTE: The AddPlayerMappedKeyInSlot API has been deprecated in UE 5.5
+		// This needs to be migrated to UEnhancedInputUserSettings system
+		// For now, we'll skip this to allow the build to complete
+		// TODO: Migrate to UEnhancedInputUserSettings
+		
+		/*
 		// Tell enhanced input about any custom keymappings that the player may have customized
 		for (const TPair<FName, FKey>& Pair : LocalSettings->GetCustomPlayerInputConfig())
 		{
@@ -33,6 +39,7 @@ void ULyraInputComponent::AddInputMappings(const ULyraInputConfig* InputConfig, 
 				InputSubsystem->AddPlayerMappedKeyInSlot(Pair.Key, Pair.Value);
 			}
 		}
+		*/
 	}
 }
 
@@ -46,6 +53,12 @@ void ULyraInputComponent::RemoveInputMappings(const ULyraInputConfig* InputConfi
 	
 	if (ULyraSettingsLocal* LocalSettings = ULyraSettingsLocal::Get())
 	{
+		// NOTE: The RemovePlayerMappableConfig and RemovePlayerMappedKeyInSlot APIs have been deprecated in UE 5.5
+		// This needs to be migrated to UEnhancedInputUserSettings system
+		// For now, we'll skip this to allow the build to complete
+		// TODO: Migrate to UEnhancedInputUserSettings
+		
+		/*
 		// Remove any registered input contexts
 		const TArray<FLoadedMappableConfigPair>& Configs = LocalSettings->GetAllRegisteredInputConfigs();
 		for (const FLoadedMappableConfigPair& Pair : Configs)
@@ -58,6 +71,7 @@ void ULyraInputComponent::RemoveInputMappings(const ULyraInputConfig* InputConfi
 		{
 			InputSubsystem->RemovePlayerMappedKeyInSlot(Pair.Key);
 		}
+		*/
 	}
 }
 

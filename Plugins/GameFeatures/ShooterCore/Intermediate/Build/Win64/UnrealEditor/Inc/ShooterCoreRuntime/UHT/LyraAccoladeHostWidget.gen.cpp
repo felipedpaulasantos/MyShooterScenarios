@@ -119,12 +119,13 @@ struct LyraAccoladeHostWidget_eventCreateAccoladeWidget_Parms
 	{
 	}
 };
-static FName NAME_ULyraAccoladeHostWidget_CreateAccoladeWidget = FName(TEXT("CreateAccoladeWidget"));
+static const FName NAME_ULyraAccoladeHostWidget_CreateAccoladeWidget = FName(TEXT("CreateAccoladeWidget"));
 UUserWidget* ULyraAccoladeHostWidget::CreateAccoladeWidget(FPendingAccoladeEntry const& Entry)
 {
 	LyraAccoladeHostWidget_eventCreateAccoladeWidget_Parms Parms;
 	Parms.Entry=Entry;
-	ProcessEvent(FindFunctionChecked(NAME_ULyraAccoladeHostWidget_CreateAccoladeWidget),&Parms);
+	UFunction* Func = FindFunctionChecked(NAME_ULyraAccoladeHostWidget_CreateAccoladeWidget);
+	ProcessEvent(Func,&Parms);
 	return Parms.ReturnValue;
 }
 struct Z_Construct_UFunction_ULyraAccoladeHostWidget_CreateAccoladeWidget_Statics
@@ -170,12 +171,13 @@ struct LyraAccoladeHostWidget_eventDestroyAccoladeWidget_Parms
 {
 	UUserWidget* Widget;
 };
-static FName NAME_ULyraAccoladeHostWidget_DestroyAccoladeWidget = FName(TEXT("DestroyAccoladeWidget"));
+static const FName NAME_ULyraAccoladeHostWidget_DestroyAccoladeWidget = FName(TEXT("DestroyAccoladeWidget"));
 void ULyraAccoladeHostWidget::DestroyAccoladeWidget(UUserWidget* Widget)
 {
 	LyraAccoladeHostWidget_eventDestroyAccoladeWidget_Parms Parms;
 	Parms.Widget=Widget;
-	ProcessEvent(FindFunctionChecked(NAME_ULyraAccoladeHostWidget_DestroyAccoladeWidget),&Parms);
+	UFunction* Func = FindFunctionChecked(NAME_ULyraAccoladeHostWidget_DestroyAccoladeWidget);
+	ProcessEvent(Func,&Parms);
 }
 struct Z_Construct_UFunction_ULyraAccoladeHostWidget_DestroyAccoladeWidget_Statics
 {
@@ -335,10 +337,10 @@ struct Z_CompiledInDeferFile_FID_UnrealProjects_MyShooterScenarios_Plugins_GameF
 		{ FPendingAccoladeEntry::StaticStruct, Z_Construct_UScriptStruct_FPendingAccoladeEntry_Statics::NewStructOps, TEXT("PendingAccoladeEntry"), &Z_Registration_Info_UScriptStruct_PendingAccoladeEntry, CONSTRUCT_RELOAD_VERSION_INFO(FStructReloadVersionInfo, sizeof(FPendingAccoladeEntry), 2807307257U) },
 	};
 	static constexpr FClassRegisterCompiledInInfo ClassInfo[] = {
-		{ Z_Construct_UClass_ULyraAccoladeHostWidget, ULyraAccoladeHostWidget::StaticClass, TEXT("ULyraAccoladeHostWidget"), &Z_Registration_Info_UClass_ULyraAccoladeHostWidget, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(ULyraAccoladeHostWidget), 3857063195U) },
+		{ Z_Construct_UClass_ULyraAccoladeHostWidget, ULyraAccoladeHostWidget::StaticClass, TEXT("ULyraAccoladeHostWidget"), &Z_Registration_Info_UClass_ULyraAccoladeHostWidget, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(ULyraAccoladeHostWidget), 3514828148U) },
 	};
 };
-static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_UnrealProjects_MyShooterScenarios_Plugins_GameFeatures_ShooterCore_Source_ShooterCoreRuntime_Public_Accolades_LyraAccoladeHostWidget_h_2821003087(TEXT("/Script/ShooterCoreRuntime"),
+static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_UnrealProjects_MyShooterScenarios_Plugins_GameFeatures_ShooterCore_Source_ShooterCoreRuntime_Public_Accolades_LyraAccoladeHostWidget_h_735247475(TEXT("/Script/ShooterCoreRuntime"),
 	Z_CompiledInDeferFile_FID_UnrealProjects_MyShooterScenarios_Plugins_GameFeatures_ShooterCore_Source_ShooterCoreRuntime_Public_Accolades_LyraAccoladeHostWidget_h_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_UnrealProjects_MyShooterScenarios_Plugins_GameFeatures_ShooterCore_Source_ShooterCoreRuntime_Public_Accolades_LyraAccoladeHostWidget_h_Statics::ClassInfo),
 	Z_CompiledInDeferFile_FID_UnrealProjects_MyShooterScenarios_Plugins_GameFeatures_ShooterCore_Source_ShooterCoreRuntime_Public_Accolades_LyraAccoladeHostWidget_h_Statics::ScriptStructInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_UnrealProjects_MyShooterScenarios_Plugins_GameFeatures_ShooterCore_Source_ShooterCoreRuntime_Public_Accolades_LyraAccoladeHostWidget_h_Statics::ScriptStructInfo),
 	nullptr, 0);

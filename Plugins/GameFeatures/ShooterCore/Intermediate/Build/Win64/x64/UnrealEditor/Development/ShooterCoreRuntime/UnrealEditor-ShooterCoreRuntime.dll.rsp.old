@@ -22,8 +22,8 @@
 /DELAYLOAD:"d3d12.dll"
 /DELAYLOAD:"DBGHELP.DLL"
 /LIBPATH:"G:\Program Files\Microsoft Visual Studio\VC\Tools\MSVC\14.38.33130\lib\x64"
-/LIBPATH:"C:\Program Files (x86)\Windows Kits\10\lib\10.0.19041.0\ucrt\x64"
-/LIBPATH:"C:\Program Files (x86)\Windows Kits\10\lib\10.0.19041.0\um\x64"
+/LIBPATH:"C:\Program Files (x86)\Windows Kits\10\lib\10.0.22621.0\ucrt\x64"
+/LIBPATH:"C:\Program Files (x86)\Windows Kits\10\lib\10.0.22621.0\um\x64"
 /NODEFAULTLIB:"LIBCMT"
 /NODEFAULTLIB:"LIBCPMT"
 /NODEFAULTLIB:"LIBCMTD"
@@ -35,6 +35,7 @@
 /NODEFAULTLIB:"LIBCD"
 /NODEFAULTLIB:"LIBCPD"
 /FUNCTIONPADMIN:6
+/NOIMPLIB
 "F:\UnrealProjects\MyShooterScenarios\Intermediate\Build\Win64\x64\LyraEditor\Development\UnrealEd\SharedPCH.UnrealEd.Project.ValApi.Cpp20.h.obj"
 "F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\ShooterCore\Intermediate\Build\Win64\x64\UnrealEditor\Development\ShooterCoreRuntime\Module.ShooterCoreRuntime.cpp.obj"
 "F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\ShooterCore\Intermediate\Build\Win64\x64\UnrealEditor\Development\ShooterCoreRuntime\ControlPointStatusMessage.gen.cpp.obj"
@@ -87,6 +88,5 @@
 "dwmapi.lib"
 "imm32.lib"
 /OUT:"F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\ShooterCore\Binaries\Win64\UnrealEditor-ShooterCoreRuntime.dll"
-/IMPLIB:"F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\ShooterCore\Intermediate\Build\Win64\x64\UnrealEditor\Development\ShooterCoreRuntime\UnrealEditor-ShooterCoreRuntime.sup.lib"
 /PDB:"F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\ShooterCore\Binaries\Win64\UnrealEditor-ShooterCoreRuntime.pdb"
 /ignore:4078

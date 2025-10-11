@@ -7,6 +7,7 @@
 #include "Player/LyraPlayerState.h"
 #include "Engine/World.h"
 #include "GameModes/LyraGameMode.h"
+#include "Misc/DataValidation.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraTeamCreationComponent)
 
@@ -18,9 +19,9 @@ ULyraTeamCreationComponent::ULyraTeamCreationComponent(const FObjectInitializer&
 }
 
 #if WITH_EDITOR
-EDataValidationResult ULyraTeamCreationComponent::IsDataValid(TArray<FText>& ValidationErrors)
+EDataValidationResult ULyraTeamCreationComponent::IsDataValid(FDataValidationContext& Context) const
 {
-	EDataValidationResult Result = Super::IsDataValid(ValidationErrors);
+	EDataValidationResult Result = Super::IsDataValid(Context);
 
 	//@TODO: TEAMS: Validate that all display assets have the same properties set!
 
@@ -183,4 +184,3 @@ int32 ULyraTeamCreationComponent::GetLeastPopulatedTeamID() const
 	return INDEX_NONE;
 }
 #endif	// WITH_SERVER_CODE
-

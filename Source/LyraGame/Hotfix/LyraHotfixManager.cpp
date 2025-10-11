@@ -176,7 +176,7 @@ void ULyraHotfixManager::OnHotfixAvailablityCheck(const TArray<FCloudFileHeader>
 	}
 }
 
-bool ULyraHotfixManager::PreProcessDownloadedFileData(TArray<uint8>& FileData) const
+bool ULyraHotfixManager::PreProcessDownloadedFileData(const FCloudFileHeader& FileHeader, TArray<uint8>& FileData) const
 {
 	// No need to preprocess if there is no data
 	if (FileData.Num() == 0)
@@ -224,4 +224,3 @@ void ULyraHotfixManager::StartHotfixProcess()
 
 	Super::StartHotfixProcess();
 }
-

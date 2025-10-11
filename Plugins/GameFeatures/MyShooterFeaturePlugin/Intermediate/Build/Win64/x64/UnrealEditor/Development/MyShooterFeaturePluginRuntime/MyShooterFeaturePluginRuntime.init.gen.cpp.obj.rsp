@@ -4,8 +4,10 @@
 /Yu"F:\UnrealProjects\MyShooterScenarios\Intermediate\Build\Win64\x64\LyraEditor\Development\UnrealEd\SharedPCH.UnrealEd.Project.ValApi.Cpp20.h"
 /Fp"F:\UnrealProjects\MyShooterScenarios\Intermediate\Build\Win64\x64\LyraEditor\Development\UnrealEd\SharedPCH.UnrealEd.Project.ValApi.Cpp20.h.pch"
 /Fo"F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\MyShooterFeaturePlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\MyShooterFeaturePluginRuntime\MyShooterFeaturePluginRuntime.init.gen.cpp.obj"
+/experimental:log "F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\MyShooterFeaturePlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\MyShooterFeaturePluginRuntime\MyShooterFeaturePluginRuntime.init.gen.cpp.sarif"
 /sourceDependencies "F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\MyShooterFeaturePlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\MyShooterFeaturePluginRuntime\MyShooterFeaturePluginRuntime.init.gen.cpp.dep.json"
 @"F:\UnrealProjects\MyShooterScenarios\Plugins\GameFeatures\MyShooterFeaturePlugin\Intermediate\Build\Win64\x64\UnrealEditor\Development\MyShooterFeaturePluginRuntime\MyShooterFeaturePluginRuntime.Shared.rsp"
+/d2ssa-cfg-question-
 /Zc:inline
 /nologo
 /Oi

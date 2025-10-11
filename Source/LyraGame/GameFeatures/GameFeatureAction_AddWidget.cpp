@@ -7,6 +7,7 @@
 #include "GameFeaturesSubsystemSettings.h"
 #include "CommonUIExtensions.h"
 #include "UI/LyraHUD.h"
+#include "Misc/DataValidation.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameFeatureAction_AddWidget)
 
@@ -37,9 +38,9 @@ void UGameFeatureAction_AddWidgets::AddAdditionalAssetBundleData(FAssetBundleDat
 #endif
 
 #if WITH_EDITOR
-EDataValidationResult UGameFeatureAction_AddWidgets::IsDataValid(TArray<FText>& ValidationErrors)
+EDataValidationResult UGameFeatureAction_AddWidgets::IsDataValid(FDataValidationContext& Context) const
 {
-	EDataValidationResult Result = CombineDataValidationResults(Super::IsDataValid(ValidationErrors), EDataValidationResult::Valid);
+	EDataValidationResult Result = CombineDataValidationResults(Super::IsDataValid(Context), EDataValidationResult::Valid);
 
 	{
 		int32 EntryIndex = 0;
@@ -48,13 +49,13 @@ EDataValidationResult UGameFeatureAction_AddWidgets::IsDataValid(TArray<FText>& 
 			if (Entry.LayoutClass.IsNull())
 			{
 				Result = EDataValidationResult::Invalid;
-				ValidationErrors.Add(FText::Format(LOCTEXT("LayoutHasNullClass", "Null WidgetClass at index {0} in Layout"), FText::AsNumber(EntryIndex)));
+				Context.AddError(FText::Format(LOCTEXT("LayoutHasNullClass", "Null WidgetClass at index {0} in Layout"), FText::AsNumber(EntryIndex)));
 			}
 
 			if (!Entry.LayerID.IsValid())
 			{
 				Result = EDataValidationResult::Invalid;
-				ValidationErrors.Add(FText::Format(LOCTEXT("LayoutHasNoTag", "LayerID is not set at index {0} in Widgets"), FText::AsNumber(EntryIndex)));
+				Context.AddError(FText::Format(LOCTEXT("LayoutHasNoTag", "LayerID is not set at index {0} in Widgets"), FText::AsNumber(EntryIndex)));
 			}
 
 			++EntryIndex;
@@ -68,13 +69,13 @@ EDataValidationResult UGameFeatureAction_AddWidgets::IsDataValid(TArray<FText>& 
 			if (Entry.WidgetClass.IsNull())
 			{
 				Result = EDataValidationResult::Invalid;
-				ValidationErrors.Add(FText::Format(LOCTEXT("EntryHasNullClass", "Null WidgetClass at index {0} in Widgets"), FText::AsNumber(EntryIndex)));
+				Context.AddError(FText::Format(LOCTEXT("EntryHasNullClass", "Null WidgetClass at index {0} in Widgets"), FText::AsNumber(EntryIndex)));
 			}
 
 			if (!Entry.SlotID.IsValid())
 			{
 				Result = EDataValidationResult::Invalid;
-				ValidationErrors.Add(FText::Format(LOCTEXT("EntryHasNoTag", "SlotID is not set at index {0} in Widgets"), FText::AsNumber(EntryIndex)));
+				Context.AddError(FText::Format(LOCTEXT("EntryHasNoTag", "SlotID is not set at index {0} in Widgets"), FText::AsNumber(EntryIndex)));
 			}
 			++EntryIndex;
 		}
@@ -181,4 +182,3 @@ void UGameFeatureAction_AddWidgets::RemoveWidgets(AActor* Actor, FPerContextData
 }
 
 #undef LOCTEXT_NAMESPACE
-

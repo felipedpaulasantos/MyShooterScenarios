@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #include "GameFeatureAction_AddGameplayCuePath.h"
+#include "Misc/DataValidation.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameFeatureAction_AddGameplayCuePath)
 
@@ -12,9 +13,9 @@ UGameFeatureAction_AddGameplayCuePath::UGameFeatureAction_AddGameplayCuePath()
 }
 
 #if WITH_EDITOR
-EDataValidationResult UGameFeatureAction_AddGameplayCuePath::IsDataValid(TArray<FText>& ValidationErrors)
+EDataValidationResult UGameFeatureAction_AddGameplayCuePath::IsDataValid(FDataValidationContext& Context) const
 {
-	EDataValidationResult Result = Super::IsDataValid(ValidationErrors);
+	EDataValidationResult Result = Super::IsDataValid(Context);
 
 	FText ErrorReason = FText::GetEmpty();
 	for (const FDirectoryPath& Directory : DirectoryPathsToAdd)
@@ -22,8 +23,8 @@ EDataValidationResult UGameFeatureAction_AddGameplayCuePath::IsDataValid(TArray<
 		if (Directory.Path.IsEmpty())
 		{
 			const FText InvalidCuePathError = FText::Format(LOCTEXT("InvalidCuePathError", "'{0}' is not a valid path!"), FText::FromString(Directory.Path));
-			ValidationErrors.Emplace(InvalidCuePathError);
-			ValidationErrors.Emplace(ErrorReason);
+			Context.AddError(InvalidCuePathError);
+			Context.AddError(ErrorReason);
 			Result = CombineDataValidationResults(Result, EDataValidationResult::Invalid);
 		}
 	}
@@ -33,4 +34,3 @@ EDataValidationResult UGameFeatureAction_AddGameplayCuePath::IsDataValid(TArray<
 #endif	// WITH_EDITOR
 
 #undef LOCTEXT_NAMESPACE
-

@@ -12,6 +12,9 @@
 #include "PlayerMappableInputConfig.h"
 #include "GameFramework/Pawn.h"
 #include "Input/LyraMappableConfigPair.h"
+#include "Misc/DataValidation.h"
+#include "InputMappingContext.h"
+#include "EnhancedActionKeyMapping.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(GameFeatureAction_AddInputConfig)
 
@@ -65,9 +68,9 @@ void UGameFeatureAction_AddInputConfig::OnGameFeatureDeactivating(FGameFeatureDe
 }
 
 #if WITH_EDITOR
-EDataValidationResult UGameFeatureAction_AddInputConfig::IsDataValid(TArray<FText>& ValidationErrors)
+EDataValidationResult UGameFeatureAction_AddInputConfig::IsDataValid(FDataValidationContext& Context) const
 {
-	EDataValidationResult Result = CombineDataValidationResults(Super::IsDataValid(ValidationErrors), EDataValidationResult::Valid);
+	EDataValidationResult Result = CombineDataValidationResults(Super::IsDataValid(Context), EDataValidationResult::Valid);
 
 	int32 EntryIndex = 0;
 	for (const FMappableConfigPair& Pair : InputConfigs)
@@ -75,7 +78,7 @@ EDataValidationResult UGameFeatureAction_AddInputConfig::IsDataValid(TArray<FTex
 		if (Pair.Config.IsNull())
 		{
 			Result = EDataValidationResult::Invalid;
-			ValidationErrors.Add(FText::Format(LOCTEXT("NullConfigPointer", "Null Config pointer at index {0} in Pair list"), FText::AsNumber(EntryIndex)));
+			Context.AddError(FText::Format(LOCTEXT("NullConfigPointer", "Null Config pointer at index {0} in Pair list"), FText::AsNumber(EntryIndex)));
 		}
 
 		++EntryIndex;
@@ -145,22 +148,33 @@ void UGameFeatureAction_AddInputConfig::AddInputConfig(APawn* Pawn, FPerContextD
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
 		{
-			// We don't want to ignore keys that were "Down" when we add the mapping context
-			// This allows you to die holding a movement key, keep holding while waiting for respawn,
-			// and have it be applied after you respawn immediately. Leaving bIgnoreAllPressedKeysUntilRelease
-			// to it's default "true" state would require the player to release the movement key,
-			// and press it again when they respawn
 			FModifyContextOptions Options = {};
 			Options.bIgnoreAllPressedKeysUntilRelease = false;
 			
-			// Add the input mappings
+			// Add the input mapping contexts from each config
 			for (const FMappableConfigPair& Pair : InputConfigs)
 			{
 				if (Pair.bShouldActivateAutomatically && Pair.CanBeActivated())
 				{
-					Subsystem->AddPlayerMappableConfig(Pair.Config.LoadSynchronous(), Options);
+					if (UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous())
+					{
+						// UE 5.5: GetMappingContexts() returns a TMap<UInputMappingContext*, int32>
+						// where the key is the context and the value is the priority
+						const TMap<TObjectPtr<UInputMappingContext>, int32>& Contexts = LoadedConfig->GetMappingContexts();
+						
+						for (const TPair<TObjectPtr<UInputMappingContext>, int32>& ContextPair : Contexts)
+						{
+							if (ContextPair.Key)
+							{
+								Subsystem->AddMappingContext(ContextPair.Key, ContextPair.Value, Options);
+								UE_LOG(LogGameFeatures, Log, TEXT("Added Input Mapping Context: %s (Priority: %d)"), 
+									*ContextPair.Key->GetName(), ContextPair.Value);
+							}
+						}
+					}
 				}
 			}
+			
 			ActiveData.PawnsAddedTo.AddUnique(Pawn);
 		}		
 	}
@@ -172,14 +186,28 @@ void UGameFeatureAction_AddInputConfig::RemoveInputConfig(APawn* Pawn, FPerConte
 
 	if (ULocalPlayer* LP = PlayerController ? PlayerController->GetLocalPlayer() : nullptr)
 	{
-		// If this is called during the shutdown of the game then there isn't a strict guarantee that the input subsystem is valid
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
 		{
-			// Remove the input mappings
+			// Remove the input mapping contexts that were added
 			for (const FMappableConfigPair& Pair : InputConfigs)
 			{
-				Subsystem->RemovePlayerMappableConfig(Pair.Config.LoadSynchronous());
-			}	
+				if (Pair.bShouldActivateAutomatically && Pair.CanBeActivated())
+				{
+					if (UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous())
+					{
+						// UE 5.5: GetMappingContexts() returns a TMap<UInputMappingContext*, int32>
+						const TMap<TObjectPtr<UInputMappingContext>, int32>& Contexts = LoadedConfig->GetMappingContexts();
+						
+						for (const TPair<TObjectPtr<UInputMappingContext>, int32>& ContextPair : Contexts)
+						{
+							if (ContextPair.Key)
+							{
+								Subsystem->RemoveMappingContext(ContextPair.Key);
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	ActiveData.PawnsAddedTo.Remove(Pawn);

@@ -2,6 +2,7 @@
 	"RemapUnityFiles": 
 	{
 		"Module.MyShooterFeaturePluginRuntime.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
 			"MyDebugLibrary.cpp.obj",
 			"MyShooterFeaturePluginRuntimeModule.cpp.obj",
 			"MYSTCharacterWithAbilities.cpp.obj",

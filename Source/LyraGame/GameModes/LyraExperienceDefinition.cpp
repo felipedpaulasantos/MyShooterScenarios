@@ -2,6 +2,7 @@
 
 #include "LyraExperienceDefinition.h"
 #include "GameFeatureAction.h"
+#include "Misc/DataValidation.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraExperienceDefinition)
 
@@ -12,22 +13,22 @@ ULyraExperienceDefinition::ULyraExperienceDefinition()
 }
 
 #if WITH_EDITOR
-EDataValidationResult ULyraExperienceDefinition::IsDataValid(TArray<FText>& ValidationErrors)
+EDataValidationResult ULyraExperienceDefinition::IsDataValid(FDataValidationContext& Context) const
 {
-	EDataValidationResult Result = CombineDataValidationResults(Super::IsDataValid(ValidationErrors), EDataValidationResult::Valid);
+	EDataValidationResult Result = CombineDataValidationResults(Super::IsDataValid(Context), EDataValidationResult::Valid);
 
 	int32 EntryIndex = 0;
-	for (UGameFeatureAction* Action : Actions)
+	for (const UGameFeatureAction* Action : Actions)
 	{
 		if (Action)
 		{
-			EDataValidationResult ChildResult = Action->IsDataValid(ValidationErrors);
+			EDataValidationResult ChildResult = Action->IsDataValid(Context);
 			Result = CombineDataValidationResults(Result, ChildResult);
 		}
 		else
 		{
 			Result = EDataValidationResult::Invalid;
-			ValidationErrors.Add(FText::Format(LOCTEXT("ActionEntryIsNull", "Null entry at index {0} in Actions"), FText::AsNumber(EntryIndex)));
+			Context.AddError(FText::Format(LOCTEXT("ActionEntryIsNull", "Null entry at index {0} in Actions"), FText::AsNumber(EntryIndex)));
 		}
 
 		++EntryIndex;
@@ -47,7 +48,7 @@ EDataValidationResult ULyraExperienceDefinition::IsDataValid(TArray<FText>& Vali
 
 		if (FirstNativeParent != ParentClass)
 		{
-			ValidationErrors.Add(FText::Format(LOCTEXT("ExperienceInheritenceIsUnsupported", "Blueprint subclasses of Blueprint experiences is not currently supported (use composition via ActionSets instead). Parent class was {0} but should be {1}."), 
+			Context.AddError(FText::Format(LOCTEXT("ExperienceInheritenceIsUnsupported", "Blueprint subclasses of Blueprint experiences is not currently supported (use composition via ActionSets instead). Parent class was {0} but should be {1}."), 
 				FText::AsCultureInvariant(GetPathNameSafe(ParentClass)),
 				FText::AsCultureInvariant(GetPathNameSafe(FirstNativeParent))
 			));
@@ -75,4 +76,3 @@ void ULyraExperienceDefinition::UpdateAssetBundleData()
 #endif // WITH_EDITORONLY_DATA
 
 #undef LOCTEXT_NAMESPACE
-

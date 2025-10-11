@@ -2,6 +2,7 @@
 	"RemapUnityFiles": 
 	{
 		"Module.ShooterCoreRuntime.cpp.obj": [
+			"PerModuleInline.gen.cpp.obj",
 			"LyraAccoladeDefinition.cpp.obj",
 			"LyraAccoladeHostWidget.cpp.obj",
 			"AimAssistInputModifier.cpp.obj",

@@ -6,7 +6,8 @@
 			"MyShooterFeaturePluginRuntime.init.gen.cpp.obj",
 			"MyDebugLibrary.cpp.obj",
 			"MyShooterFeaturePluginRuntimeModule.cpp.obj",
-			"MYSTCharacterWithAbilities.cpp.obj"
+			"MYSTCharacterWithAbilities.cpp.obj",
+			"PerModuleInline.gen.cpp.obj"
 		]
 	}
 }
