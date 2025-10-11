@@ -2,11 +2,11 @@
 	"RemapUnityFiles": 
 	{
 		"Module.MyShooterFeaturePluginRuntime.cpp.obj": [
-			"MyDebugLibrary.gen.cpp.obj",
-			"MyShooterFeaturePluginRuntime.init.gen.cpp.obj",
 			"MyDebugLibrary.cpp.obj",
 			"MyShooterFeaturePluginRuntimeModule.cpp.obj",
-			"MYSTCharacterWithAbilities.cpp.obj"
+			"MYSTCharacterWithAbilities.cpp.obj",
+			"MyDebugLibrary.gen.cpp.obj",
+			"MyShooterFeaturePluginRuntime.init.gen.cpp.obj"
 		]
 	}
 }

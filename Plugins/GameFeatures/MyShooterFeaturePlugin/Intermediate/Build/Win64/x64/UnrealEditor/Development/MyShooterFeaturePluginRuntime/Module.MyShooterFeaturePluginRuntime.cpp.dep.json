@@ -6,9 +6,11 @@
         "PCH": "f:\\unrealprojects\\myshooterscenarios\\intermediate\\build\\win64\\x64\\lyraeditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.cpp20.h.pch",
         "Includes": [
             "f:\\unrealprojects\\myshooterscenarios\\plugins\\gamefeatures\\myshooterfeatureplugin\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\myshooterfeaturepluginruntime\\definitions.myshooterfeaturepluginruntime.h",
-            "f:\\unrealprojects\\myshooterscenarios\\plugins\\gamefeatures\\myshooterfeatureplugin\\source\\myshooterfeaturepluginruntime\\private\\mydebuglibrary.cpp",
+            "f:\\unrealprojects\\myshooterscenarios\\plugins\\gamefeatures\\myshooterfeatureplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\myshooterfeaturepluginruntime\\uht\\mydebuglibrary.gen.cpp",
             "f:\\unrealprojects\\myshooterscenarios\\plugins\\gamefeatures\\myshooterfeatureplugin\\source\\myshooterfeaturepluginruntime\\public\\mydebuglibrary.h",
             "f:\\unrealprojects\\myshooterscenarios\\plugins\\gamefeatures\\myshooterfeatureplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\myshooterfeaturepluginruntime\\uht\\mydebuglibrary.generated.h",
+            "f:\\unrealprojects\\myshooterscenarios\\plugins\\gamefeatures\\myshooterfeatureplugin\\intermediate\\build\\win64\\unrealeditor\\inc\\myshooterfeaturepluginruntime\\uht\\myshooterfeaturepluginruntime.init.gen.cpp",
+            "f:\\unrealprojects\\myshooterscenarios\\plugins\\gamefeatures\\myshooterfeatureplugin\\source\\myshooterfeaturepluginruntime\\private\\mydebuglibrary.cpp",
             "f:\\games\\ue_5.4\\engine\\source\\runtime\\engine\\classes\\kismet\\kismetsystemlibrary.h",
             "f:\\games\\ue_5.4\\engine\\source\\runtime\\coreuobject\\public\\uobject\\propertyaccessutil.h",
             "f:\\games\\ue_5.4\\engine\\intermediate\\build\\win64\\unrealeditor\\inc\\engine\\uht\\kismetsystemlibrary.generated.h",
