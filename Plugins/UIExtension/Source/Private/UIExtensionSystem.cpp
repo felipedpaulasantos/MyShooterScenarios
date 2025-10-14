@@ -62,13 +62,20 @@ bool FUIExtensionPoint::DoesExtensionPassContract(const FUIExtension* Extension)
 
 void UUIExtensionSubsystem::AddReferencedObjects(UObject* InThis, FReferenceCollector& Collector)
 {
+	// Call parent implementation first
+	Super::AddReferencedObjects(InThis, Collector);
+	
 	if (UUIExtensionSubsystem* ExtensionSubsystem = Cast<UUIExtensionSubsystem>(InThis))
 	{
 		for (auto MapIt = ExtensionSubsystem->ExtensionPointMap.CreateIterator(); MapIt; ++MapIt)
 		{
 			for (const TSharedPtr<FUIExtensionPoint>& ValueElement : MapIt.Value())
 			{
-				Collector.AddReferencedObjects(ValueElement->AllowedDataClasses);
+				// Use AddReferencedObject for each element instead of AddReferencedObjects for the array
+				for (TObjectPtr<UClass>& AllowedClass : ValueElement->AllowedDataClasses)
+				{
+					Collector.AddReferencedObject(AllowedClass);
+				}
 			}
 		}
 

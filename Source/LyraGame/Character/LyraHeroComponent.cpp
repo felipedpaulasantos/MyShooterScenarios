@@ -375,22 +375,12 @@ void ULyraHeroComponent::Input_AbilityInputTagReleased(FGameplayTag InputTag)
 		return;
 	}
 
-	UE_LOG(LogLyra, Warning, TEXT("[INPUT DEBUG] Input_AbilityInputTagReleased called for tag: %s"), *InputTag.ToString());
-
 	if (const ULyraPawnExtensionComponent* PawnExtComp = ULyraPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
 	{
 		if (ULyraAbilitySystemComponent* LyraASC = PawnExtComp->GetLyraAbilitySystemComponent())
 		{
 			LyraASC->AbilityInputTagReleased(InputTag);
 		}
-		else
-		{
-			UE_LOG(LogLyra, Error, TEXT("[INPUT DEBUG] LyraASC is NULL!"));
-		}
-	}
-	else
-	{
-		UE_LOG(LogLyra, Error, TEXT("[INPUT DEBUG] PawnExtComp is NULL!"));
 	}
 }
 

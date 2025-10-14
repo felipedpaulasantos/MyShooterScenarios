@@ -62,7 +62,7 @@ public:
 	FGameplayTag ExtensionPointTag;
 	TWeakObjectPtr<UObject> ContextObject;
 	EUIExtensionPointMatch ExtensionPointTagMatchType = EUIExtensionPointMatch::ExactMatch;
-	TArray<UClass*> AllowedDataClasses;
+	TArray<TObjectPtr<UClass>> AllowedDataClasses;
 	FExtendExtensionPointDelegate Callback;
 
 	// Tests if the extension and the extension point match up, if they do then this extension point should learn
