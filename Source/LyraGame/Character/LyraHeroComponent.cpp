@@ -249,16 +249,10 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 		{
 			if (const ULyraInputConfig* InputConfig = PawnData->InputConfig)
 			{
-				// UE 5.5: Use the static RegisterPair method to handle input config registration
-				for (const FMappableConfigPair& Pair : DefaultInputConfigs)
-				{
-					if (Pair.bShouldActivateAutomatically && Pair.CanBeActivated())
-					{
-						// Use the static method provided by FMappableConfigPair
-						FMappableConfigPair::RegisterPair(Pair);
-					}
-				}
-
+				// UE 5.5: The old PlayerMappableInputConfig system has been removed
+				// Input configs are now loaded through the PawnData's InputConfig directly
+				// The DefaultInputConfigs array is deprecated and should not be used
+				
 				// The Lyra Input Component has some additional functions to map Gameplay Tags to an Input Action.
 				// If you want this functionality but still want to change your input component class, make it a subclass
 				// of the ULyraInputComponent or modify this component accordingly.

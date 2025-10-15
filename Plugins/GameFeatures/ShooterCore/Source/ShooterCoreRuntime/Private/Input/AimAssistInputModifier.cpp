@@ -145,7 +145,8 @@ FAimAssistSettings::FAimAssistSettings()
 
 float FAimAssistSettings::GetTargetWeightForTime(float Time) const
 {
-	if (!ensure(TargetWeightCurve != nullptr))
+	// TargetWeightCurve is optional - if not set, we return 0.0f which disables weight-based aim assist
+	if (TargetWeightCurve == nullptr)
 	{
 		return 0.0f;
 	}
@@ -155,7 +156,8 @@ float FAimAssistSettings::GetTargetWeightForTime(float Time) const
 
 float FAimAssistSettings::GetTargetWeightMaxTime() const
 {
-	if (!ensure(TargetWeightCurve != nullptr))
+	// TargetWeightCurve is optional - if not set, we return 0.0f
+	if (TargetWeightCurve == nullptr)
 	{
 		return 0.0f;
 	}
@@ -593,15 +595,18 @@ void UAimAssistInputModifier::UpdateTargetData(float DeltaTime)
 
 const float UAimAssistInputModifier::GetSensitivtyScalar(const ULyraSettingsShared* SharedSettings) const
 {
-	if (SharedSettings && SensitivityLevelTable)
+	if (!SharedSettings || !SensitivityLevelTable)
 	{
-		const ELyraGamepadSensitivity Sens = TargetingType == ELyraTargetingType::Normal ? SharedSettings->GetGamepadLookSensitivityPreset() : SharedSettings->GetGamepadTargetingSensitivityPreset();
-		return SensitivityLevelTable->SensitivtyEnumToFloat(Sens);
+		return 1.0f;
 	}
 	
-	UE_LOG(LogAimAssist, Warning, TEXT("SensitivityLevelTable is null, using default value!"));
-	return (TargetingType == ELyraTargetingType::Normal) ? 1.0f : 0.5f;	
+	const ELyraGamepadSensitivity Sens = TargetingType == ELyraTargetingType::Normal 
+		? SharedSettings->GetGamepadLookSensitivityPreset() 
+		: SharedSettings->GetGamepadTargetingSensitivityPreset();
+	
+	return SensitivityLevelTable->SensitivtyEnumToFloat(Sens);
 }
+
 
 FRotator UAimAssistInputModifier::UpdateRotationalVelocity(APlayerController* PC, float DeltaTime, FVector CurrentLookInputValue, FVector CurrentMoveInputValue)
 {
@@ -709,7 +714,6 @@ FRotator UAimAssistInputModifier::UpdateRotationalVelocity(APlayerController* PC
 		// The slowed rotation rate is a percentage of the normal look rotation rates.
 		FRotator SlowRates = (LookRates * (1.0f - SlowStrength));
 
-		const bool bUseDynamicSlow = true;
 
 		if (Settings.bUseDynamicSlow)
 		{
