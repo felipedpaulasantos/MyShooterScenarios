@@ -4,6 +4,7 @@
 
 #include "EnhancedActionKeyMapping.h"
 #include "GameSettingValue.h"
+#include "PlayerMappableKeySettings.h"
 
 #include "LyraSettingKeyboardInput.generated.h"
 
@@ -13,7 +14,7 @@ class UObject;
 // ULyraSettingKeyboardInput
 //--------------------------------------
 
-class UPlayerMappableInputConfig;
+class UInputMappingContext;
 
 struct FKeyboardOption
 {
@@ -21,7 +22,7 @@ struct FKeyboardOption
 	
 	FEnhancedActionKeyMapping InputMapping {};
 	
-	const UPlayerMappableInputConfig* OwningConfig = nullptr;
+	const UInputMappingContext* OwningConfig = nullptr;
 
 	void ResetToDefault();
 
@@ -46,7 +47,7 @@ public:
 	ULyraSettingKeyboardInput();
 
 	/** Initalize this setting widget based off the given mapping */
-	void SetInputData(FEnhancedActionKeyMapping& BaseMapping, const UPlayerMappableInputConfig* InOwningConfig, int32 InKeyBindSlot);
+	void SetInputData(FEnhancedActionKeyMapping& BaseMapping, const UInputMappingContext* InOwningConfig, int32 InKeyBindSlot);
 
 	FText GetPrimaryKeyText() const;
 	FText GetSecondaryKeyText() const;
@@ -58,7 +59,11 @@ public:
 	bool ChangeBinding(int32 InKeyBindSlot, FKey NewKey);
 	void GetAllMappedActionsFromKey(int32 InKeyBindSlot, FKey Key, TArray<FName>& OutActionNames) const;
 	
-	FText GetSettingDisplayName() const { return FirstMappableOption.InputMapping.PlayerMappableOptions.DisplayName; }
+	FText GetSettingDisplayName() const 
+	{ 
+		const UPlayerMappableKeySettings* KeySettings = FirstMappableOption.InputMapping.GetPlayerMappableKeySettings();
+		return KeySettings ? KeySettings->DisplayName : FText::GetEmpty();
+	}
 	
 protected:
 	/** ULyraSetting */

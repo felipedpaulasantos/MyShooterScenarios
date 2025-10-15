@@ -10,8 +10,8 @@
 #include "GenericPlatform/GenericPlatformFramePacer.h"
 #include "Player/LyraLocalPlayer.h"
 #include "Performance/LyraPerformanceStatTypes.h"
-#include "PlayerMappableInputConfig.h"
-#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "PlayerMappableKeySettings.h"
 #include "ICommonUIModule.h"
 #include "CommonUISettings.h"
 #include "SoundControlBusMix.h"
@@ -1266,7 +1266,7 @@ FName ULyraSettingsLocal::GetControllerPlatform() const
 	return ControllerPlatform;
 }
 
-void ULyraSettingsLocal::RegisterInputConfig(ECommonInputType Type, const UPlayerMappableInputConfig* NewConfig, const bool bIsActive)
+void ULyraSettingsLocal::RegisterInputConfig(ECommonInputType Type, const UInputMappingContext* NewConfig, const bool bIsActive)
 {
 	if (NewConfig)
 	{
@@ -1282,7 +1282,7 @@ void ULyraSettingsLocal::RegisterInputConfig(ECommonInputType Type, const UPlaye
 	}
 }
 
-int32 ULyraSettingsLocal::UnregisterInputConfig(const UPlayerMappableInputConfig* ConfigToRemove)
+int32 ULyraSettingsLocal::UnregisterInputConfig(const UInputMappingContext* ConfigToRemove)
 {
 	if (ConfigToRemove)
 	{
@@ -1297,11 +1297,11 @@ int32 ULyraSettingsLocal::UnregisterInputConfig(const UPlayerMappableInputConfig
 	return INDEX_NONE;
 }
 
-const UPlayerMappableInputConfig* ULyraSettingsLocal::GetInputConfigByName(FName ConfigName) const
+const UInputMappingContext* ULyraSettingsLocal::GetInputConfigByName(FName ConfigName) const
 {
 	for (const FLoadedMappableConfigPair& Pair : RegisteredInputConfigs)
 	{
-		if (Pair.Config->GetConfigName() == ConfigName)
+		if (Pair.Config && Pair.Config->GetFName() == ConfigName)
 		{
 			return Pair.Config;
 		}
@@ -1339,12 +1339,24 @@ void ULyraSettingsLocal::GetAllMappingNamesFromKey(const FKey InKey, TArray<FNam
 	// adding any names of actions that are bound to that key
 	for (const FLoadedMappableConfigPair& Pair : RegisteredInputConfigs)
 	{
-		if (Pair.Type == ECommonInputType::MouseAndKeyboard)
+		if (Pair.Type == ECommonInputType::MouseAndKeyboard && Pair.Config)
 		{
-			for (const FEnhancedActionKeyMapping& Mapping : Pair.Config->GetPlayerMappableKeys())
+			for (const FEnhancedActionKeyMapping& Mapping : Pair.Config->GetMappings())
 			{
-				FName MappingName(Mapping.PlayerMappableOptions.DisplayName.ToString());
-				FName ActionName = Mapping.PlayerMappableOptions.Name;
+				// Only check player mappable keys
+				if (!Mapping.IsPlayerMappable())
+				{
+					continue;
+				}
+				
+				const UPlayerMappableKeySettings* KeySettings = Mapping.GetPlayerMappableKeySettings();
+				if (!KeySettings)
+				{
+					continue;
+				}
+				
+				FName MappingName(KeySettings->DisplayName.ToString());
+				FName ActionName = KeySettings->Name;
 				// make sure it isn't custom bound as well
 				if (const FKey* MappingKey = CustomKeyboardConfig.Find(ActionName))
 				{
@@ -1374,16 +1386,19 @@ void ULyraSettingsLocal::AddOrUpdateCustomKeyboardBindings(const FName MappingNa
 	
 	if (InputConfigName != TEXT("Custom"))
 	{
-		// Copy Presets.
-		if (const UPlayerMappableInputConfig* DefaultConfig = GetInputConfigByName(TEXT("Default")))
+		// Copy Presets from the default input mapping context
+		if (const UInputMappingContext* DefaultConfig = GetInputConfigByName(TEXT("Default")))
 		{
-			for (const FEnhancedActionKeyMapping& Mapping : DefaultConfig->GetPlayerMappableKeys())
+			for (const FEnhancedActionKeyMapping& Mapping : DefaultConfig->GetMappings())
 			{
-				// Make sure that the mapping has a valid name, its possible to have an empty name
-				// if someone has marked a mapping as "Player Mappable" but deleted the default field value
-				if (Mapping.PlayerMappableOptions.Name != NAME_None)
+				// Only include player mappable keys
+				if (Mapping.IsPlayerMappable())
 				{
-					CustomKeyboardConfig.Add(Mapping.PlayerMappableOptions.Name, Mapping.Key);
+					const UPlayerMappableKeySettings* KeySettings = Mapping.GetPlayerMappableKeySettings();
+					if (KeySettings && KeySettings->Name != NAME_None)
+					{
+						CustomKeyboardConfig.Add(KeySettings->Name, Mapping.Key);
+					}
 				}
 			}
 		}

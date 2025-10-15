@@ -8,7 +8,7 @@
 
 #include "LyraMappableConfigPair.generated.h"
 
-class UPlayerMappableInputConfig;
+class UInputMappingContext;
 
 /** A container to organize loaded player mappable configs to their CommonUI input type */
 USTRUCT(BlueprintType)
@@ -17,17 +17,15 @@ struct FLoadedMappableConfigPair
 	GENERATED_BODY()
 
 	FLoadedMappableConfigPair() = default;
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	FLoadedMappableConfigPair(const UPlayerMappableInputConfig* InConfig, ECommonInputType InType, const bool InIsActive)
+	FLoadedMappableConfigPair(const UInputMappingContext* InConfig, ECommonInputType InType, const bool InIsActive)
 		: Config(InConfig)
 		, Type(InType)
 		, bIsActive(InIsActive)
 	{}
 
-	/** The player mappable input config that should be applied to the Enhanced Input subsystem */
+	/** The input mapping context that should be applied to the Enhanced Input subsystem */
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
-	TObjectPtr<const UPlayerMappableInputConfig> Config = nullptr;
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	TObjectPtr<const UInputMappingContext> Config = nullptr;
 
 	/** The type of device that this mapping config should be applied to */
 	UPROPERTY(BlueprintReadOnly, VisibleAnywhere)
@@ -46,10 +44,12 @@ struct FMappableConfigPair
 	
 	FMappableConfigPair() = default;
 	
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	UPROPERTY(EditAnywhere)
-	TSoftObjectPtr<UPlayerMappableInputConfig> Config;
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	TSoftObjectPtr<UInputMappingContext> Config;
+
+	/** Priority for this mapping context when multiple contexts are active */
+	UPROPERTY(EditAnywhere)
+	int32 Priority = 0;
 
 	/**
 	 * The type of config that this is. Useful for filtering out configs by the current input device

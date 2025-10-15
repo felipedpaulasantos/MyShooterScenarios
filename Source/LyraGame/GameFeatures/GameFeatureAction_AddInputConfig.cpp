@@ -9,7 +9,6 @@
 #include "GameFramework/PlayerController.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFeatures/GameFeatureAction_WorldActionBase.h"
-#include "PlayerMappableInputConfig.h"
 #include "GameFramework/Pawn.h"
 #include "Input/LyraMappableConfigPair.h"
 #include "Misc/DataValidation.h"
@@ -150,33 +149,16 @@ void UGameFeatureAction_AddInputConfig::AddInputConfig(APawn* Pawn, FPerContextD
 			FModifyContextOptions Options = {};
 			Options.bIgnoreAllPressedKeysUntilRelease = false;
 			
-			// Add the input mapping contexts from each config
+			// Add the input mapping contexts directly
 			for (const FMappableConfigPair& Pair : InputConfigs)
 			{
 				if (Pair.bShouldActivateAutomatically && Pair.CanBeActivated())
 				{
-					// NOTE: UPlayerMappableInputConfig is deprecated in UE 5.5+, but we wrap it in pragmas
-					// to suppress warnings until migration to UEnhancedInputUserSettings is complete.
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
-					UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous();
-					if (LoadedConfig)
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
+					if (UInputMappingContext* LoadedContext = Pair.Config.LoadSynchronous())
 					{
-						// UE 5.5: GetMappingContexts() returns a TMap<UInputMappingContext*, int32>
-						// where the key is the context and the value is the priority
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
-						const TMap<TObjectPtr<UInputMappingContext>, int32>& Contexts = LoadedConfig->GetMappingContexts();
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
-						
-						for (const TPair<TObjectPtr<UInputMappingContext>, int32>& ContextPair : Contexts)
-						{
-							if (ContextPair.Key)
-							{
-								Subsystem->AddMappingContext(ContextPair.Key, ContextPair.Value, Options);
-								UE_LOG(LogGameFeatures, Log, TEXT("Added Input Mapping Context: %s (Priority: %d)"), 
-									*ContextPair.Key->GetName(), ContextPair.Value);
-							}
-						}
+						Subsystem->AddMappingContext(LoadedContext, Pair.Priority, Options);
+						UE_LOG(LogGameFeatures, Log, TEXT("Added Input Mapping Context: %s (Priority: %d)"), 
+							*LoadedContext->GetName(), Pair.Priority);
 					}
 				}
 			}
@@ -199,24 +181,10 @@ void UGameFeatureAction_AddInputConfig::RemoveInputConfig(APawn* Pawn, FPerConte
 			{
 				if (Pair.bShouldActivateAutomatically && Pair.CanBeActivated())
 				{
-					// NOTE: UPlayerMappableInputConfig is deprecated in UE 5.5+, but we wrap it in pragmas
-					// to suppress warnings until migration to UEnhancedInputUserSettings is complete.
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
-					UPlayerMappableInputConfig* LoadedConfig = Pair.Config.LoadSynchronous();
-					if (LoadedConfig)
+					if (UInputMappingContext* LoadedContext = Pair.Config.LoadSynchronous())
 					{
-						// UE 5.5: GetMappingContexts() returns a TMap<UInputMappingContext*, int32>
-						const TMap<TObjectPtr<UInputMappingContext>, int32>& Contexts = LoadedConfig->GetMappingContexts();
-						
-						for (const TPair<TObjectPtr<UInputMappingContext>, int32>& ContextPair : Contexts)
-						{
-							if (ContextPair.Key)
-							{
-								Subsystem->RemoveMappingContext(ContextPair.Key);
-							}
-						}
+						Subsystem->RemoveMappingContext(LoadedContext);
 					}
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
 				}
 			}
 		}

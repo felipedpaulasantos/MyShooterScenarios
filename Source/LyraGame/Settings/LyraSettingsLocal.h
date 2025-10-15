@@ -14,7 +14,7 @@ enum class ELyraStatDisplayMode : uint8;
 
 class ULyraLocalPlayer;
 class UObject;
-class UPlayerMappableInputConfig;
+class UInputMappingContext;
 class USoundControlBus;
 class USoundControlBusMix;
 struct FFrame;
@@ -317,7 +317,7 @@ public:
 	UFUNCTION()
 	void SetAudioOutputDeviceId(const FString& InAudioOutputDeviceId);
 
-private:
+	private:
 	UPROPERTY(Config)
 	FString AudioOutputDeviceId;
 	
@@ -362,16 +362,14 @@ public:
 	FInputConfigDelegate OnInputConfigDeactivated;
 	
 	/** Register the given input config with the settings to make it available to the player. */
-PRAGMA_DISABLE_DEPRECATION_WARNINGS
-	void RegisterInputConfig(ECommonInputType Type, const UPlayerMappableInputConfig* NewConfig, const bool bIsActive);
+	void RegisterInputConfig(ECommonInputType Type, const UInputMappingContext* NewConfig, const bool bIsActive);
 	
 	/** Unregister the given input config. Returns the number of configs removed. */
-	int32 UnregisterInputConfig(const UPlayerMappableInputConfig* ConfigToRemove);
+	int32 UnregisterInputConfig(const UInputMappingContext* ConfigToRemove);
 
 	/** Get an input config with a certain name. If the config doesn't exist then nullptr will be returned. */
 	UFUNCTION(BlueprintCallable)
-	const UPlayerMappableInputConfig* GetInputConfigByName(FName ConfigName) const;
-PRAGMA_ENABLE_DEPRECATION_WARNINGS
+	const UInputMappingContext* GetInputConfigByName(FName ConfigName) const;
 
 	/** Get all currently registered input configs */
 	const TArray<FLoadedMappableConfigPair>& GetAllRegisteredInputConfigs() const { return RegisteredInputConfigs; }

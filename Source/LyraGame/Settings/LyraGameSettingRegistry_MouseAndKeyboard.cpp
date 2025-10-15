@@ -12,6 +12,8 @@
 #include "LyraSettingsShared.h"
 #include "Player/LyraLocalPlayer.h"
 #include "PlayerMappableInputConfig.h"
+#include "InputMappingContext.h"
+#include "PlayerMappableKeySettings.h"
 
 class ULocalPlayer;
 
@@ -151,16 +153,31 @@ UGameSettingCollection* ULyraGameSettingRegistry::InitializeMouseAndKeyboardSett
 					continue;
 				}
 				
-				TArray<FEnhancedActionKeyMapping> ConfigMappings = InputConfigPair.Config->GetPlayerMappableKeys();
+				if (!InputConfigPair.Config)
+				{
+					continue;
+				}
+				
+				// Get player mappable keys from the input mapping context
+				TArray<FEnhancedActionKeyMapping> ConfigMappings;
+				for (const FEnhancedActionKeyMapping& Mapping : InputConfigPair.Config->GetMappings())
+				{
+					// Only include mappings that are player mappable
+					if (Mapping.IsPlayerMappable())
+					{
+						ConfigMappings.Add(Mapping);
+					}
+				}
+				
 				if (ConfigMappings.IsEmpty())
 				{
-					UE_LOG(LogLyraGameSettingRegistry, Warning, TEXT("PlayerMappableInputConfig '%s' has no player mappable keys in it! Skipping it in the setting registry..."), *InputConfigPair.Config->GetConfigName().ToString());
+					UE_LOG(LogLyraGameSettingRegistry, Warning, TEXT("InputMappingContext '%s' has no player mappable keys in it! Skipping it in the setting registry..."), *InputConfigPair.Config->GetFName().ToString());
 					continue;
 				}
 				
 				UGameSettingCollection* ConfigSettingCollection = NewObject<UGameSettingCollection>();
-				ConfigSettingCollection->SetDevName(InputConfigPair.Config->GetConfigName());
-				ConfigSettingCollection->SetDisplayName(InputConfigPair.Config->GetDisplayName());
+				ConfigSettingCollection->SetDevName(InputConfigPair.Config->GetFName());
+				ConfigSettingCollection->SetDisplayName(FText::FromName(InputConfigPair.Config->GetFName()));
 				Screen->AddSetting(ConfigSettingCollection);
 				
 				// Add each player mappable key to the settings screen!
@@ -168,17 +185,23 @@ UGameSettingCollection* ULyraGameSettingRegistry::InitializeMouseAndKeyboardSett
 				{
 					ULyraSettingKeyboardInput* ExistingSetting = nullptr;
 
-					// Make sure that we cannot add two settings with the same FName for saving purposes
-					if (AddedSettings.Contains(Mapping.PlayerMappableOptions.Name))
+					const UPlayerMappableKeySettings* KeySettings = Mapping.GetPlayerMappableKeySettings();
+					if (!KeySettings)
 					{
-						UE_LOG(LogLyraGameSettingRegistry, Warning, TEXT("A setting with the name '%s' from config '%s' has already been added! Please remove duplicate name."), *Mapping.PlayerMappableOptions.Name.ToString(), *InputConfigPair.Config->GetConfigName().ToString());
+						continue;
+					}
+
+					// Make sure that we cannot add two settings with the same FName for saving purposes
+					if (AddedSettings.Contains(KeySettings->Name))
+					{
+						UE_LOG(LogLyraGameSettingRegistry, Warning, TEXT("A setting with the name '%s' from config '%s' has already been added! Please remove duplicate name."), *KeySettings->Name.ToString(), *InputConfigPair.Config->GetFName().ToString());
 						continue;
 					}
 					
 					for (UGameSetting* Setting : ConfigSettingCollection->GetChildSettings())
 					{
 						ULyraSettingKeyboardInput* LyraKeyboardSetting = Cast<ULyraSettingKeyboardInput>(Setting);
-						if (LyraKeyboardSetting->GetSettingDisplayName().EqualToCaseIgnored(Mapping.PlayerMappableOptions.DisplayName))
+						if (LyraKeyboardSetting && LyraKeyboardSetting->GetSettingDisplayName().EqualToCaseIgnored(KeySettings->DisplayName))
 						{
 							ExistingSetting = LyraKeyboardSetting;
 							break;
@@ -187,12 +210,12 @@ UGameSettingCollection* ULyraGameSettingRegistry::InitializeMouseAndKeyboardSett
 					
 					FEnhancedActionKeyMapping MappingSynthesized(Mapping);
 					// If the player has bound a custom key to this action, then set it to that
-					if (const FKey* PlayerBoundKey = CustomKeyMap.Find(Mapping.PlayerMappableOptions.Name))
+					if (const FKey* PlayerBoundKey = CustomKeyMap.Find(KeySettings->Name))
 					{
 						MappingSynthesized.Key = *PlayerBoundKey;
 					}
 
-					if (MappingSynthesized.PlayerMappableOptions.Name != NAME_None && !MappingSynthesized.PlayerMappableOptions.DisplayName.IsEmpty())
+					if (KeySettings->Name != NAME_None && !KeySettings->DisplayName.IsEmpty())
 					{
 						// Create the settings widget and initialize it, adding it to this config's section
 						ULyraSettingKeyboardInput* InputBinding = ExistingSetting ? ExistingSetting : NewObject<ULyraSettingKeyboardInput>();
@@ -205,11 +228,11 @@ UGameSettingCollection* ULyraGameSettingRegistry::InitializeMouseAndKeyboardSett
 							ConfigSettingCollection->AddSetting(InputBinding);	
 						}
 						
-						AddedSettings.Add(MappingSynthesized.PlayerMappableOptions.Name);
+						AddedSettings.Add(KeySettings->Name);
 					}
 					else
 					{
-						UE_LOG(LogLyraGameSettingRegistry, Warning, TEXT("A setting with the name '%s' from config '%s' could not be added, one of its names is empty!"), *Mapping.PlayerMappableOptions.Name.ToString(), *InputConfigPair.Config->GetConfigName().ToString());
+						UE_LOG(LogLyraGameSettingRegistry, Warning, TEXT("A setting with the name '%s' from config '%s' could not be added, one of its names is empty!"), *KeySettings->Name.ToString(), *InputConfigPair.Config->GetFName().ToString());
 						ensure(false);
 					}
 				}

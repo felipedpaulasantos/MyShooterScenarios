@@ -4,6 +4,7 @@
 
 #include "Engine/AssetManager.h"
 #include "LyraAssetManagerStartupJob.h"
+#include "LyraLogChannels.h"
 #include "Templates/SubclassOf.h"
 #include "LyraAssetManager.generated.h"
 
@@ -132,7 +133,10 @@ AssetType* ULyraAssetManager::GetAsset(const TSoftObjectPtr<AssetType>& AssetPoi
 		if (!LoadedAsset)
 		{
 			LoadedAsset = Cast<AssetType>(SynchronousLoadAsset(AssetPath));
-			ensureAlwaysMsgf(LoadedAsset, TEXT("Failed to load asset [%s]"), *AssetPointer.ToString());
+			if (!LoadedAsset)
+			{
+				UE_LOG(LogLyra, Warning, TEXT("Failed to load asset [%s]"), *AssetPointer.ToString());
+			}
 		}
 
 		if (LoadedAsset && bKeepInMemory)
@@ -158,7 +162,10 @@ TSubclassOf<AssetType> ULyraAssetManager::GetSubclass(const TSoftClassPtr<AssetT
 		if (!LoadedSubclass)
 		{
 			LoadedSubclass = Cast<UClass>(SynchronousLoadAsset(AssetPath));
-			ensureAlwaysMsgf(LoadedSubclass, TEXT("Failed to load asset class [%s]"), *AssetPointer.ToString());
+			if (!LoadedSubclass)
+			{
+				UE_LOG(LogLyra, Warning, TEXT("Failed to load asset class [%s]"), *AssetPointer.ToString());
+			}
 		}
 
 		if (LoadedSubclass && bKeepInMemory)

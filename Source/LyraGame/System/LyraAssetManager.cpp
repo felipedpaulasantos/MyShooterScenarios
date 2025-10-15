@@ -113,9 +113,15 @@ void ULyraAssetManager::StartInitialLoading()
 	STARTUP_JOB(InitializeAbilitySystem());
 	STARTUP_JOB(InitializeGameplayCueManager());
 
+	// Only try to load GameData if the path is configured
+	if (!LyraGameDataPath.IsNull())
 	{
 		// Load base game data asset
 		STARTUP_JOB_WEIGHTED(GetGameData(), 25.f);
+	}
+	else
+	{
+		UE_LOG(LogLyra, Warning, TEXT("LyraGameDataPath is not configured in DefaultGame.ini. Skipping GameData load."));
 	}
 
 	// Run all the queued up startup jobs
@@ -141,6 +147,28 @@ void ULyraAssetManager::InitializeGameplayCueManager()
 
 const ULyraGameData& ULyraAssetManager::GetGameData()
 {
+	// Check if we have a valid path configured
+	if (LyraGameDataPath.IsNull())
+	{
+		// Create a warning but try to use a default fallback
+		static bool bWarningShown = false;
+		if (!bWarningShown)
+		{
+			UE_LOG(LogLyra, Warning, TEXT("LyraGameDataPath is not configured. Game systems may not function correctly. Please create DefaultGameData asset and configure it in DefaultGame.ini"));
+			bWarningShown = true;
+		}
+		
+		// Try to create a minimal fallback GameData to prevent crashes
+		static ULyraGameData* FallbackGameData = nullptr;
+		if (!FallbackGameData)
+		{
+			FallbackGameData = NewObject<ULyraGameData>();
+			FallbackGameData->AddToRoot(); // Prevent garbage collection
+			UE_LOG(LogLyra, Warning, TEXT("Using fallback GameData object. Core gameplay effects will not be available."));
+		}
+		return *FallbackGameData;
+	}
+	
 	return GetOrLoadTypedGameData<ULyraGameData>(LyraGameDataPath);
 }
 
@@ -190,8 +218,8 @@ UPrimaryDataAsset* ULyraAssetManager::LoadGameDataOfClass(TSubclassOf<UPrimaryDa
 	}
 	else
 	{
-		// It is not acceptable to fail to load any GameData asset. It will result in soft failures that are hard to diagnose.
-		UE_LOG(LogLyra, Fatal, TEXT("Failed to load GameData asset at %s. Type %s. This is not recoverable and likely means you do not have the correct data to run %s."), *DataClassPath.ToString(), *PrimaryAssetType.ToString(), FApp::GetProjectName());
+		// Changed from Fatal to Error to prevent crash - allow game to continue with warnings
+		UE_LOG(LogLyra, Error, TEXT("Failed to load GameData asset at %s. Type %s. Game may not function correctly without this data. Please create this asset or update the path in DefaultGame.ini"), *DataClassPath.ToString(), *PrimaryAssetType.ToString());
 	}
 
 	return Asset;
