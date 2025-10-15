@@ -225,8 +225,8 @@ private:
 	void UpdateActiveTimer();
 
 private:
-	TArray<UIndicatorDescriptor*> AllIndicators;
-	TArray<UIndicatorDescriptor*> InactiveIndicators;
+	TArray<TObjectPtr<UIndicatorDescriptor>> AllIndicators;
+	TArray<TObjectPtr<UIndicatorDescriptor>> InactiveIndicators;
 	
 	FLocalPlayerContext LocalPlayerContext;
 	TWeakObjectPtr<ULyraIndicatorManagerComponent> IndicatorComponentPtr;

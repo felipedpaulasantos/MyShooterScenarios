@@ -73,7 +73,7 @@ private:
 	void OnGameFeaturePluginLoadComplete(const UE::GameFeatures::FResult& Result);
 	void OnExperienceFullLoadCompleted();
 
-	void OnActionDeactivationCompleted();
+	void OnActionDeactivationCompleted(FStringView InPauserTag);
 	void OnAllActionsDeactivated();
 
 private:

@@ -50,7 +50,7 @@ public:
 	int32 Priority = INDEX_NONE;
 	TWeakObjectPtr<UObject> ContextObject;
 	//Kept alive by UUIExtensionSubsystem::AddReferencedObjects
-	UObject* Data = nullptr;
+	TObjectPtr<UObject> Data = nullptr;
 };
 
 /**

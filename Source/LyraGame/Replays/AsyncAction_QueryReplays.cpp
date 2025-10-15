@@ -4,6 +4,7 @@
 
 #include "GameFramework/PlayerController.h"
 #include "LyraReplaySubsystem.h"
+#include "Algo/Sort.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(AsyncAction_QueryReplays)
 
@@ -54,14 +55,13 @@ void UAsyncAction_QueryReplays::OnEnumerateStreamsComplete(const FEnumerateStrea
 	// Sort demo names by date
 	struct FCompareDateTime
 	{
-		FORCEINLINE bool operator()(const ULyraReplayListEntry& A, const ULyraReplayListEntry& B) const
+		FORCEINLINE bool operator()(const ULyraReplayListEntry* A, const ULyraReplayListEntry* B) const
 		{
-			return A.StreamInfo.Timestamp.GetTicks() > B.StreamInfo.Timestamp.GetTicks();
+			return A->StreamInfo.Timestamp.GetTicks() > B->StreamInfo.Timestamp.GetTicks();
 		}
 	};
 
-	Sort(ResultList->Results.GetData(), ResultList->Results.Num(), FCompareDateTime());
+	Algo::Sort(ResultList->Results, FCompareDateTime());
 
 	QueryComplete.Broadcast(ResultList);
 }
-

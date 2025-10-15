@@ -359,7 +359,7 @@ void ULyraExperienceManagerComponent::OnExperienceFullLoadCompleted()
 #endif
 }
 
-void ULyraExperienceManagerComponent::OnActionDeactivationCompleted()
+void ULyraExperienceManagerComponent::OnActionDeactivationCompleted(FStringView InPauserTag)
 {
 	check(IsInGameThread());
 	++NumObservedPausers;
@@ -401,7 +401,10 @@ void ULyraExperienceManagerComponent::EndPlay(const EEndPlayReason::Type EndPlay
 		NumObservedPausers = 0;
 
 		// Deactivate and unload the actions
-		FGameFeatureDeactivatingContext Context(FSimpleDelegate::CreateUObject(this, &ThisClass::OnActionDeactivationCompleted));
+		FGameFeatureDeactivatingContext Context(
+			TEXT("LyraExperienceManagerComponent"),
+			[this](FStringView InPauserTag) { OnActionDeactivationCompleted(InPauserTag); }
+		);
 
 		const FWorldContext* ExistingWorldContext = GEngine->GetWorldContextFromWorld(GetWorld());
 		if (ExistingWorldContext)
@@ -464,4 +467,3 @@ void ULyraExperienceManagerComponent::OnAllActionsDeactivated()
 	CurrentExperience = nullptr;
 	//@TODO:	GEngine->ForceGarbageCollection(true);
 }
-

@@ -63,7 +63,7 @@ UObject* ULyraAssetManager::SynchronousLoadAsset(const FSoftObjectPath& AssetPat
 			LogTimePtr = MakeUnique<FScopeLogTime>(*FString::Printf(TEXT("Synchronously loaded asset [%s]"), *AssetPath.ToString()), nullptr, FScopeLogTime::ScopeLog_Seconds);
 		}
 
-		if (UAssetManager::IsValid())
+		if (UAssetManager::Get().IsInitialized())
 		{
 			return UAssetManager::GetStreamableManager().LoadSynchronous(AssetPath, false);
 		}

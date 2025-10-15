@@ -53,7 +53,16 @@ private:
 	template<typename T>
 	T* GetGameInstance() const
 	{
-		return GetTypedOuter<T>();
+		UObject* Outer = GetOuter();
+		while (Outer)
+		{
+			if (T* Result = Cast<T>(Outer))
+			{
+				return Result;
+			}
+			Outer = Outer->GetOuter();
+		}
+		return nullptr;
 	}
 
 	void Init() override;

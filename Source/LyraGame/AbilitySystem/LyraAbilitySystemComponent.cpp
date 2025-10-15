@@ -53,18 +53,12 @@ void ULyraAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 		{
 			ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(AbilitySpec.Ability);
 
-			if (LyraAbilityCDO->GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+			// All Lyra abilities use InstancedPerActor policy
+			TArray<UGameplayAbility*> Instances = AbilitySpec.GetAbilityInstances();
+			for (UGameplayAbility* AbilityInstance : Instances)
 			{
-				TArray<UGameplayAbility*> Instances = AbilitySpec.GetAbilityInstances();
-				for (UGameplayAbility* AbilityInstance : Instances)
-				{
-					ULyraGameplayAbility* LyraAbilityInstance = CastChecked<ULyraGameplayAbility>(AbilityInstance);
-					LyraAbilityInstance->OnPawnAvatarSet();
-				}
-			}
-			else
-			{
-				LyraAbilityCDO->OnPawnAvatarSet();
+				ULyraGameplayAbility* LyraAbilityInstance = CastChecked<ULyraGameplayAbility>(AbilityInstance);
+				LyraAbilityInstance->OnPawnAvatarSet();
 			}
 		}
 
@@ -103,37 +97,22 @@ void ULyraAbilitySystemComponent::CancelAbilitiesByFunc(TShouldCancelAbilityFunc
 			continue;
 		}
 
-		ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(AbilitySpec.Ability);
-
-		if (LyraAbilityCDO->GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+		// All Lyra abilities use InstancedPerActor policy - cancel all spawned instances
+		TArray<UGameplayAbility*> Instances = AbilitySpec.GetAbilityInstances();
+		for (UGameplayAbility* AbilityInstance : Instances)
 		{
-			// Cancel all the spawned instances, not the CDO.
-			TArray<UGameplayAbility*> Instances = AbilitySpec.GetAbilityInstances();
-			for (UGameplayAbility* AbilityInstance : Instances)
-			{
-				ULyraGameplayAbility* LyraAbilityInstance = CastChecked<ULyraGameplayAbility>(AbilityInstance);
+			ULyraGameplayAbility* LyraAbilityInstance = CastChecked<ULyraGameplayAbility>(AbilityInstance);
 
-				if (ShouldCancelFunc(LyraAbilityInstance, AbilitySpec.Handle))
+			if (ShouldCancelFunc(LyraAbilityInstance, AbilitySpec.Handle))
+			{
+				if (LyraAbilityInstance->CanBeCanceled())
 				{
-					if (LyraAbilityInstance->CanBeCanceled())
-					{
-						LyraAbilityInstance->CancelAbility(AbilitySpec.Handle, AbilityActorInfo.Get(), LyraAbilityInstance->GetCurrentActivationInfo(), bReplicateCancelAbility);
-					}
-					else
-					{
-						UE_LOG(LogLyraAbilitySystem, Error, TEXT("CancelAbilitiesByFunc: Can't cancel ability [%s] because CanBeCanceled is false."), *LyraAbilityInstance->GetName());
-					}
+					LyraAbilityInstance->CancelAbility(AbilitySpec.Handle, AbilityActorInfo.Get(), LyraAbilityInstance->GetCurrentActivationInfo(), bReplicateCancelAbility);
 				}
-			}
-		}
-		else
-		{
-			// Cancel the non-instanced ability CDO.
-			if (ShouldCancelFunc(LyraAbilityCDO, AbilitySpec.Handle))
-			{
-				// Non-instanced abilities can always be canceled.
-				check(LyraAbilityCDO->CanBeCanceled());
-				LyraAbilityCDO->CancelAbility(AbilitySpec.Handle, AbilityActorInfo.Get(), FGameplayAbilityActivationInfo(), bReplicateCancelAbility);
+				else
+				{
+					UE_LOG(LogLyraAbilitySystem, Error, TEXT("CancelAbilitiesByFunc: Can't cancel ability [%s] because CanBeCanceled is false."), *LyraAbilityInstance->GetName());
+				}
 			}
 		}
 	}
@@ -158,26 +137,16 @@ void ULyraAbilitySystemComponent::AbilitySpecInputPressed(FGameplayAbilitySpec& 
 	// Use replicated events instead so that the WaitInputPress ability task works.
 	if (Spec.IsActive())
 	{
-		// For instanced abilities, we need to invoke the event on each instance
-		ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(Spec.Ability);
+		// Invoke the event on each ability instance (all Lyra abilities use InstancedPerActor policy)
+		TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
 		
-		if (LyraAbilityCDO->GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+		for (UGameplayAbility* AbilityInstance : Instances)
 		{
-			TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+			// Get the current activation info from the instance itself
+			FGameplayAbilityActivationInfo InstanceActivationInfo = AbilityInstance->GetCurrentActivationInfo();
 			
-			for (UGameplayAbility* AbilityInstance : Instances)
-			{
-				// Get the current activation info from the instance itself
-				FGameplayAbilityActivationInfo InstanceActivationInfo = AbilityInstance->GetCurrentActivationInfo();
-				
-				// Invoke the replicated event with the instance's activation info
-				InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, InstanceActivationInfo.GetActivationPredictionKey());
-			}
-		}
-		else
-		{
-			// For non-instanced abilities, use the spec's activation info
-			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, Spec.ActivationInfo.GetActivationPredictionKey());
+			// Invoke the replicated event with the instance's activation info
+			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, InstanceActivationInfo.GetActivationPredictionKey());
 		}
 	}
 }
@@ -190,26 +159,16 @@ void ULyraAbilitySystemComponent::AbilitySpecInputReleased(FGameplayAbilitySpec&
 	// Use replicated events instead so that the WaitInputRelease ability task works.
 	if (Spec.IsActive())
 	{
-		// For instanced abilities, we need to invoke the event on each instance
-		ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(Spec.Ability);
+		// Invoke the event on each ability instance (all Lyra abilities use InstancedPerActor policy)
+		TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
 		
-		if (LyraAbilityCDO->GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+		for (UGameplayAbility* AbilityInstance : Instances)
 		{
-			TArray<UGameplayAbility*> Instances = Spec.GetAbilityInstances();
+			// Get the current activation info from the instance itself
+			FGameplayAbilityActivationInfo InstanceActivationInfo = AbilityInstance->GetCurrentActivationInfo();
 			
-			for (UGameplayAbility* AbilityInstance : Instances)
-			{
-				// Get the current activation info from the instance itself
-				FGameplayAbilityActivationInfo InstanceActivationInfo = AbilityInstance->GetCurrentActivationInfo();
-				
-				// Invoke the replicated event with the instance's activation info
-				InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, InstanceActivationInfo.GetActivationPredictionKey());
-			}
-		}
-		else
-		{
-			// For non-instanced abilities, use the spec's activation info
-			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, Spec.ActivationInfo.GetActivationPredictionKey());
+			// Invoke the replicated event with the instance's activation info
+			InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Spec.Handle, InstanceActivationInfo.GetActivationPredictionKey());
 		}
 	}
 }
@@ -220,7 +179,7 @@ void ULyraAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Inp
 	{
 		for (const FGameplayAbilitySpec& AbilitySpec : ActivatableAbilities.Items)
 		{
-			if (AbilitySpec.Ability && (AbilitySpec.DynamicAbilityTags.HasTagExact(InputTag)))
+			if (AbilitySpec.Ability && (AbilitySpec.GetDynamicSpecSourceTags().HasTagExact(InputTag)))
 			{
 				InputPressedSpecHandles.AddUnique(AbilitySpec.Handle);
 				InputHeldSpecHandles.AddUnique(AbilitySpec.Handle);
@@ -235,7 +194,7 @@ void ULyraAbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& In
 	{
 		for (const FGameplayAbilitySpec& AbilitySpec : ActivatableAbilities.Items)
 		{
-			if (AbilitySpec.Ability && (AbilitySpec.DynamicAbilityTags.HasTagExact(InputTag)))
+			if (AbilitySpec.Ability && (AbilitySpec.GetDynamicSpecSourceTags().HasTagExact(InputTag)))
 			{
 				InputReleasedSpecHandles.AddUnique(AbilitySpec.Handle);
 				InputHeldSpecHandles.Remove(AbilitySpec.Handle);

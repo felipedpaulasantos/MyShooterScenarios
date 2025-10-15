@@ -20,7 +20,7 @@ ALyraCharacterWithAbilities::ALyraCharacterWithAbilities(const FObjectInitialize
 	CreateDefaultSubobject<ULyraCombatSet>(TEXT("CombatSet"));
 
 	// AbilitySystemComponent needs to be updated at a high frequency.
-	NetUpdateFrequency = 100.0f;
+	SetNetUpdateFrequency(100.0f);
 }
 
 void ALyraCharacterWithAbilities::PostInitializeComponents()
@@ -35,4 +35,3 @@ UAbilitySystemComponent* ALyraCharacterWithAbilities::GetAbilitySystemComponent(
 {
 	return AbilitySystemComponent;
 }
-
