@@ -8,8 +8,8 @@
 			"PerModuleInline.gen.cpp.obj",
 			"LyraAccoladeDefinition.cpp.obj",
 			"LyraAccoladeHostWidget.cpp.obj",
+			"AimAssistInputModifier.cpp.obj",
 			"AimAssistTargetComponent.cpp.obj",
-			"AimAssistTargetManagerComponent.cpp.obj",
 			"LyraWorldCollectable.cpp.obj",
 			"AssistProcessor.cpp.obj",
 			"ElimChainProcessor.cpp.obj",
@@ -17,7 +17,7 @@
 			"ShooterCoreRuntimeModule.cpp.obj",
 			"ShooterCoreRuntimeSettings.cpp.obj",
 			"TDM_PlayerSpawningManagmentComponent.cpp.obj",
-			"AimAssistInputModifier.cpp.obj"
+			"AimAssistTargetManagerComponent.cpp.obj"
 		]
 	}
 }

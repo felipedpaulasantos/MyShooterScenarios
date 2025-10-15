@@ -748,20 +748,6 @@ msgctxt "InputKeys,Gamepad_RightTriggerAxis"
 msgid "Gamepad Right Trigger Axis"
 msgstr "게임패드 오른쪽 트리거 축"
 
-#. Key:	Gamepad_RightX
-#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(699)
-#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(699)
-msgctxt "InputKeys,Gamepad_RightX"
-msgid "Gamepad Right Thumbstick X-Axis"
-msgstr "게임패드 오른쪽 스틱 X-축"
-
-#. Key:	Gamepad_RightY
-#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(700)
-#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(700)
-msgctxt "InputKeys,Gamepad_RightY"
-msgid "Gamepad Right Thumbstick Y-Axis"
-msgstr "게임패드 왼쪽 스틱 Y-축"
-
 #. Key:	Gamepad_Special_Left
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(1234)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(1234)
@@ -1497,6 +1483,69 @@ msgctxt "InputKeys,OculusTouch_Left_Thumbstick_Y"
 msgid "Oculus Touch (L) Thumbstick Y-Axis"
 msgstr "Oculus Touch (좌) 스틱 Y"
 
+#. Key:	OculusTouch_Left_Trackpad_2D
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(852)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(852)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_2D"
+msgid "Oculus Touch (L) Trackpad 2D-Axis"
+msgstr "Oculus Touch (좌) 트랙패드 2D"
+
+#. Key:	OculusTouch_Left_Trackpad_Click
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(853)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(853)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_Click"
+msgid "Oculus Touch (L) Trackpad Button"
+msgstr "Oculus Touch (좌) 트랙패드 버튼"
+
+#. Key:	OculusTouch_Left_Trackpad_Down
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(856)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(856)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_Down"
+msgid "Oculus Touch (L) Trackpad Down"
+msgstr "혼합 현실 (좌) 트랙패드 아래"
+
+#. Key:	OculusTouch_Left_Trackpad_Left
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(857)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(857)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_Left"
+msgid "Oculus Touch (L) Trackpad Left"
+msgstr "혼합 현실 (좌) 트랙패드 왼쪽"
+
+#. Key:	OculusTouch_Left_Trackpad_Right
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(858)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(858)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_Right"
+msgid "Oculus Touch (L) Trackpad Right"
+msgstr "혼합 현실 (좌) 트랙패드 오른쪽"
+
+#. Key:	OculusTouch_Left_Trackpad_Touch
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(854)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(854)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_Touch"
+msgid "Oculus Touch (L) Trackpad Touch"
+msgstr "혼합 현실 (좌) 트랙패드 터치"
+
+#. Key:	OculusTouch_Left_Trackpad_Up
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(855)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(855)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_Up"
+msgid "Oculus Touch (L) Trackpad Up"
+msgstr "혼합 현실 (좌) 트랙패드 위"
+
+#. Key:	OculusTouch_Left_Trackpad_X
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(850)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(850)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_X"
+msgid "Oculus Touch (L) Trackpad X"
+msgstr "혼합 현실 (좌) 트랙패드 X"
+
+#. Key:	OculusTouch_Left_Trackpad_Y
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(851)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(851)
+msgctxt "InputKeys,OculusTouch_Left_Trackpad_Y"
+msgid "Oculus Touch (L) Trackpad Y"
+msgstr "혼합 현실 (좌) 트랙패드 Y"
+
 #. Key:	OculusTouch_Left_Trigger_Axis
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(892)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(892)
@@ -1658,26 +1707,89 @@ msgctxt "InputKeys,OculusTouch_Right_Thumbstick_Y"
 msgid "Oculus Touch (R) Thumbstick Y-Axis"
 msgstr "Oculus Touch (우) 스틱 Y"
 
+#. Key:	OculusTouch_Right_Trackpad_2D
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(873)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(873)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_2D"
+msgid "Oculus Touch (R) Trackpad 2D-Axis"
+msgstr "Oculus Touch (우) 트랙패드 2D"
+
+#. Key:	OculusTouch_Right_Trackpad_Click
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(874)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(874)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Click"
+msgid "Oculus Touch (R) Trackpad Button"
+msgstr "Oculus Touch (우) 트랙패드 버튼"
+
+#. Key:	OculusTouch_Right_Trackpad_Down
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(877)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(877)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Down"
+msgid "Oculus Touch (R) Trackpad Down"
+msgstr "혼합 현실 (우) 트랙패드 아래"
+
+#. Key:	OculusTouch_Right_Trackpad_Left
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(878)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(878)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Left"
+msgid "Oculus Touch (R) Trackpad Left"
+msgstr "혼합 현실 (우) 트랙패드 왼쪽"
+
+#. Key:	OculusTouch_Right_Trackpad_Right
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(879)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(879)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Right"
+msgid "Oculus Touch (R) Trackpad Right"
+msgstr "혼합 현실 (우) 트랙패드 오른쪽"
+
+#. Key:	OculusTouch_Right_Trackpad_Touch
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(875)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(875)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Touch"
+msgid "Oculus Touch (R) Trackpad Touch"
+msgstr "혼합 현실 (우) 트랙패드 터치"
+
+#. Key:	OculusTouch_Right_Trackpad_Up
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(876)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(876)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Up"
+msgid "Oculus Touch (R) Trackpad Up"
+msgstr "혼합 현실 (우) 트랙패드 위"
+
+#. Key:	OculusTouch_Right_Trackpad_X
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(871)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(871)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_X"
+msgid "Oculus Touch (R) Trackpad X"
+msgstr "혼합 현실 (우) 트랙패드 X"
+
+#. Key:	OculusTouch_Right_Trackpad_Y
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(872)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(872)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Y"
+msgid "Oculus Touch (R) Trackpad Y"
+msgstr "혼합 현실 (우) 트랙패드 Y"
+
 #. Key:	OculusTouch_Right_Trigger_Axis
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(913)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(913)
 msgctxt "InputKeys,OculusTouch_Right_Trigger_Axis"
 msgid "Oculus Touch (R) Trigger Axis"
-msgstr "Oculus Touch (우) 트리거 축"
+msgstr "혼합 현실 (우) 트리거 축"
 
 #. Key:	OculusTouch_Right_Trigger_Click
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(912)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(912)
 msgctxt "InputKeys,OculusTouch_Right_Trigger_Click"
 msgid "Oculus Touch (R) Trigger"
-msgstr "Oculus Touch (우) 트리거"
+msgstr "혼합 현실 (우) 트리거"
 
 #. Key:	OculusTouch_Right_Trigger_Touch
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(914)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(914)
 msgctxt "InputKeys,OculusTouch_Right_Trigger_Touch"
 msgid "Oculus Touch (R) Trigger Touch"
-msgstr "Oculus Touch (우) 트리거 터치"
+msgstr "혼합 현실 (우) 트리거 터치"
 
 #. Key:	OculusTouchSubCategory
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(882)
@@ -2260,13 +2372,6 @@ msgctxt "InputKeys,ValveIndex_Left_Trigger_Click"
 msgid "Valve Index (L) Trigger"
 msgstr "Valve Index (좌) 트리거"
 
-#. Key:	ValveIndex_Left_Trigger_Touch
-#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(940)
-#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(940)
-msgctxt "InputKeys,ValveIndex_Left_Trigger_Touch"
-msgid "Valve Index (L) Trigger Touch"
-msgstr "Valve Index (좌) 트리거 터치"
-
 #. Key:	ValveIndex_Right_A_Click
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(959)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(959)
@@ -2393,12 +2498,19 @@ msgctxt "InputKeys,ValveIndex_Right_Trackpad_2D"
 msgid "Valve Index (R) Trackpad 2D-Axis"
 msgstr "Valve Index (우) 트랙패드 2D"
 
+#. Key:	ValveIndex_Right_Trackpad_Click
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
+msgctxt "InputKeys,ValveIndex_Right_Trackpad_Click"
+msgid "Valve Index (R) Trackpad Button"
+msgstr "Valve Index (우) 트랙패드 버튼"
+
 #. Key:	ValveIndex_Right_Trackpad_Down
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(987)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(987)
 msgctxt "InputKeys,ValveIndex_Right_Trackpad_Down"
 msgid "Valve Index (R) Trackpad Down"
-msgstr "Valve Index (우) 트랙패드 아래"
+msgstr "혼합 현실 (우) 트랙패드 아래"
 
 #. Key:	ValveIndex_Right_Trackpad_Force
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
@@ -2789,160 +2901,6 @@ msgstr "엔진을 구동하기 위해서는 OpenGL 4.3이 필요합니다."
 #. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Linux/LinuxDynamicRHI.cpp(93)
 #: ../../../Engine/Source/Runtime/RHI/Private/Linux/LinuxDynamicRHI.cpp(93)
 msgctxt "LinuxDynamicRHI,RequiredVulkan"
-msgid "Vulkan Driver is required to run the engine."
-msgstr "엔진을 구동하기 위해서는 Vulkan 드라이버가 필요합니다."
-
-#. Key:	DriverDownloadLinkAMD
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(203)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(203)
-msgctxt "MessageDialog,DriverDownloadLinkAMD"
-msgid "https://www.amd.com/en/support"
-msgstr "https://www.amd.com/en/support"
-
-#. Key:	DriverDownloadLinkIntel
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(208)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(208)
-msgctxt "MessageDialog,DriverDownloadLinkIntel"
-msgid "https://downloadcenter.intel.com/product/80939/Graphics"
-msgstr "https://downloadcenter.intel.com/product/80939/Graphics"
-
-#. Key:	DriverDownloadLinkNVIDIA
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(198)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(198)
-msgctxt "MessageDialog,DriverDownloadLinkNVIDIA"
-msgid "https://www.nvidia.com/en-us/geforce/drivers/"
-msgstr "https://www.nvidia.com/en-us/geforce/drivers/"
-
-#. Key:	LatestVideoCardDriverIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(230)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(230)
-msgctxt "MessageDialog,LatestVideoCardDriverIssueReport"
-msgid "The latest version of the {Vendor} graphics driver has known issues.\nPlease install the recommended driver version.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "{Vendor} 그래픽 드라이버의 최신 버전에 문제가 보고되었습니다.\n권장 드라이버 버전을 설치해 주세요.\n\n다음의 URL로 이동하여 드라이버를 다운로드하시겠습니까?\n\n{Hyperlink}\n\n{AdapterName}\n설치: {InstalledVer}\n권장: {RecommendedVer}"
-
-#. Key:	LatestVideoCardDriverRHIIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(226)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(226)
-msgctxt "MessageDialog,LatestVideoCardDriverRHIIssueReport"
-msgid "The latest version of the {Vendor} graphics driver has known issues in {RHI}.\nPlease install the recommended driver version or switch to a different rendering API.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "{Vendor} 그래픽 드라이버의 최신 버전에 {RHI} 문제가 보고되었습니다.\n권장 드라이버 버전을 설치하거나 다른 렌더링 API로 전환해 주세요.\n\n다음의 URL로 이동하여 드라이버를 다운로드하시겠습니까?\n\n{Hyperlink}\n\n{AdapterName}\n설치: {InstalledVer}\n권장: {RecommendedVer}"
-
-#. Key:	TitleVideoCardDriverIssue
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(245)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(245)
-msgctxt "MessageDialog,TitleVideoCardDriverIssue"
-msgid "WARNING: Known issues with graphics driver"
-msgstr "경고: 그래픽 드라이버 문제"
-
-#. Key:	UpdateMacOSX_Body
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(280)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(280)
-msgctxt "MessageDialog,UpdateMacOSX_Body"
-msgid "Please update to the latest version of macOS for best performance and stability."
-msgstr "최고의 성능과 안정성을 위해 macOS 최신 버전으로 업데이트하세요."
-
-#. Key:	UpdateMacOSX_Title
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(281)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(281)
-msgctxt "MessageDialog,UpdateMacOSX_Title"
-msgid "Update macOS"
-msgstr "macOS 업데이트"
-
-#. Key:	VideoCardDriverIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(241)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(241)
-msgctxt "MessageDialog,VideoCardDriverIssueReport"
-msgid "The installed version of the {Vendor} graphics driver has known issues.\nPlease install either the latest or the recommended driver version.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "{Vendor} 그래픽 드라이버의 설치 버전에 문제가 보고되었습니다.\n최신 드라이버 버전으로 업데이트하거나 권장 드라이버 버전을 설치해 주세요.\n\n다음의 URL로 이동하여 드라이버를 다운로드하시겠습니까?\n\n{Hyperlink}\n\n{AdapterName}\n설치: {InstalledVer}\n권장: {RecommendedVer}"
-
-#. Key:	VideoCardDriverRHIIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(237)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(237)
-msgctxt "MessageDialog,VideoCardDriverRHIIssueReport"
-msgid "The installed version of the {Vendor} graphics driver has known issues in {RHI}.\nPlease install either the latest or the recommended driver version or switch to a different rendering API.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "{Vendor} 그래픽 드라이버의 설치 버전에 {RHI} 문제가 보고되었습니다.\n최신 드라이버 버전 또는 권장 드라이버 버전을 설치하거나 다른 렌더링 API로 전환해 주세요.\n\n다음의 URL로 이동하여 드라이버를 다운로드하시겠습니까?\n\n{Hyperlink}\n\n{AdapterName}\n설치: {InstalledVer}\n권장: {RecommendedVer}"
-
-#. Key:	DebugGameName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(347)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(347)
-msgctxt "UnrealBuildConfigurations,DebugGameName"
-msgid "DebugGame"
-msgstr "디버그게임"
-
-#. Key:	DebugName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(344)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(344)
-msgctxt "UnrealBuildConfigurations,DebugName"
-msgid "Debug"
-msgstr "디버그"
-
-#. Key:	DevelopmentName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(350)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(350)
-msgctxt "UnrealBuildConfigurations,DevelopmentName"
-msgid "Development"
-msgstr "개발"
-
-#. Key:	ShippingName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(353)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(353)
-msgctxt "UnrealBuildConfigurations,ShippingName"
-msgid "Shipping"
-msgstr "배포"
-
-#. Key:	TestName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(356)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(356)
-msgctxt "UnrealBuildConfigurations,TestName"
-msgid "Test"
-msgstr "테스트"
-
-#. Key:	UnknownName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(359)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(359)
-msgctxt "UnrealBuildConfigurations,UnknownName"
-msgid "Unknown"
-msgstr "알 수 없음"
-
-#. Key:	MissingTargetedShaderFormats
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(653)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(653)
-msgctxt "WindowsDynamicRHI,MissingTargetedShaderFormats"
-msgid "Unable to launch with RHI '{0}' since the project is not configured to support it."
-msgstr ""
-
-#. Key:	RequiredDX11Feature_11_SM5
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(739)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(739)
-msgctxt "WindowsDynamicRHI,RequiredDX11Feature_11_SM5"
-msgid "A D3D11-compatible GPU (Feature Level 11.0, Shader Model 5.0) is required to run the engine."
-msgstr "엔진을 구동하기 위해서는 D3D11 호환 GPU(기능 수준 11.0, 셰이더 모델 5.0)가 필요합니다."
-
-#. Key:	RequiredDX12
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(713)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(713)
-msgctxt "WindowsDynamicRHI,RequiredDX12"
-msgid "DirectX 12 is not supported on your system. Try running without the -dx12 or -d3d12 command line argument."
-msgstr ""
-
-#. Key:	RequiredDX12SM6
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(684)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(684)
-msgctxt "WindowsDynamicRHI,RequiredDX12SM6"
-msgid "DirectX 12 with Feature Level SM6 is not supported on your system. Try running without the -sm6 command line argument."
-msgstr ""
-
-#. Key:	RequiredOpenGL
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(751)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(751)
-msgctxt "WindowsDynamicRHI,RequiredOpenGL"
-msgid "OpenGL 4.3 is required to run the engine."
-msgstr "엔진을 구동하기 위해서는 OpenGL 4.3이 필요합니다."
-
-#. Key:	RequiredVulkan
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(745)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(745)
-msgctxt "WindowsDynamicRHI,RequiredVulkan"
 msgid "Vulkan Driver is required to run the engine."
 msgstr "엔진을 구동하기 위해서는 Vulkan 드라이버가 필요합니다."
 

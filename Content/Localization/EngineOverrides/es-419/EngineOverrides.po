@@ -748,20 +748,6 @@ msgctxt "InputKeys,Gamepad_RightTriggerAxis"
 msgid "Gamepad Right Trigger Axis"
 msgstr "Eje del gatillo derecho del gamepad"
 
-#. Key:	Gamepad_RightX
-#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(699)
-#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(699)
-msgctxt "InputKeys,Gamepad_RightX"
-msgid "Gamepad Right Thumbstick X-Axis"
-msgstr "Eje-X del joystick derecho del gamepad"
-
-#. Key:	Gamepad_RightY
-#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(700)
-#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(700)
-msgctxt "InputKeys,Gamepad_RightY"
-msgid "Gamepad Right Thumbstick Y-Axis"
-msgstr "Eje-Y del joystick derecho del gamepad"
-
 #. Key:	Gamepad_Special_Left
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(1234)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(1234)
@@ -1167,6 +1153,13 @@ msgstr "Joystick hacia la izquierda (D) de Mixed Reality"
 msgctxt "InputKeys,MixedReality_Right_Thumbstick_Right"
 msgid "Mixed Reality (R) Thumbstick Right"
 msgstr "Joystick hacia la derecha (D) de Mixed Reality"
+
+#. Key:	MixedReality_Right_Thumbstick_Touch
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(871)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(871)
+msgctxt "InputKeys,MixedReality_Right_Thumbstick_Touch"
+msgid "Mixed Reality (R) Thumbstick Touch"
+msgstr "Tocar el joystick (D) de Mixed Reality"
 
 #. Key:	MixedReality_Right_Thumbstick_Up
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(867)
@@ -1657,6 +1650,69 @@ msgstr "Joystick X (D) de Oculus Touch"
 msgctxt "InputKeys,OculusTouch_Right_Thumbstick_Y"
 msgid "Oculus Touch (R) Thumbstick Y-Axis"
 msgstr "Joystick Y (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_2D
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(983)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(983)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_2D"
+msgid "Oculus Touch (R) Trackpad 2D-Axis"
+msgstr "Trackpad 2D (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_Click
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Click"
+msgid "Oculus Touch (R) Trackpad Button"
+msgstr "Trackpad (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_Down
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(987)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(987)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Down"
+msgid "Oculus Touch (R) Trackpad Down"
+msgstr "Trackpad hacia abajo (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_Left
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(988)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(988)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Left"
+msgid "Oculus Touch (R) Trackpad Left"
+msgstr "Trackpad hacia la izquierda (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_Right
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(989)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(989)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Right"
+msgid "Oculus Touch (R) Trackpad Right"
+msgstr "Trackpad hacia la derecha (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_Touch
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(985)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(985)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Touch"
+msgid "Oculus Touch (R) Trackpad Touch"
+msgstr "Tocar el trackpad (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_Up
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(986)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(986)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Up"
+msgid "Oculus Touch (R) Trackpad Up"
+msgstr "Trackpad hacia arriba (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_X
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(981)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(981)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_X"
+msgid "Oculus Touch (R) Trackpad X"
+msgstr "Trackpad X (D) de Oculus Touch"
+
+#. Key:	OculusTouch_Right_Trackpad_Y
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(982)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(982)
+msgctxt "InputKeys,OculusTouch_Right_Trackpad_Y"
+msgid "Oculus Touch (R) Trackpad Y"
+msgstr "Trackpad Y (D) de Oculus Touch"
 
 #. Key:	OculusTouch_Right_Trigger_Axis
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(913)
@@ -2260,13 +2316,6 @@ msgctxt "InputKeys,ValveIndex_Left_Trigger_Click"
 msgid "Valve Index (L) Trigger"
 msgstr "Gatillo (I) de Valve Index"
 
-#. Key:	ValveIndex_Left_Trigger_Touch
-#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(940)
-#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(940)
-msgctxt "InputKeys,ValveIndex_Left_Trigger_Touch"
-msgid "Valve Index (L) Trigger Touch"
-msgstr "Tocar el gatillo (I) de Valve Index"
-
 #. Key:	ValveIndex_Right_A_Click
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(959)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(959)
@@ -2393,19 +2442,19 @@ msgctxt "InputKeys,ValveIndex_Right_Trackpad_2D"
 msgid "Valve Index (R) Trackpad 2D-Axis"
 msgstr "Trackpad 2D (D) de Valve Index"
 
+#. Key:	ValveIndex_Right_Trackpad_Click
+#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
+#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
+msgctxt "InputKeys,ValveIndex_Right_Trackpad_Click"
+msgid "Valve Index (R) Trackpad Button"
+msgstr "Trackpad (D) de Valve Index"
+
 #. Key:	ValveIndex_Right_Trackpad_Down
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(987)
 #: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(987)
 msgctxt "InputKeys,ValveIndex_Right_Trackpad_Down"
 msgid "Valve Index (R) Trackpad Down"
 msgstr "Trackpad hacia abajo (D) de Valve Index"
-
-#. Key:	ValveIndex_Right_Trackpad_Force
-#. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
-#: ../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(984)
-msgctxt "InputKeys,ValveIndex_Right_Trackpad_Force"
-msgid "Valve Index (R) Trackpad Force"
-msgstr "Fuerza sobre el trackpad (D) de Valve Index"
 
 #. Key:	ValveIndex_Right_Trackpad_Left
 #. SourceLocation:	../../../Engine/Source/Runtime/InputCore/Private/InputCoreTypes.cpp(988)
@@ -2791,160 +2840,6 @@ msgstr "Se requiere OpenGL 4.3 para ejecutar el procesador."
 msgctxt "LinuxDynamicRHI,RequiredVulkan"
 msgid "Vulkan Driver is required to run the engine."
 msgstr "Se requiere Vulkan Driver para ejecutar el procesador."
-
-#. Key:	DriverDownloadLinkAMD
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(203)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(203)
-msgctxt "MessageDialog,DriverDownloadLinkAMD"
-msgid "https://www.amd.com/en/support"
-msgstr "https://www.amd.com/es/support"
-
-#. Key:	DriverDownloadLinkIntel
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(208)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(208)
-msgctxt "MessageDialog,DriverDownloadLinkIntel"
-msgid "https://downloadcenter.intel.com/product/80939/Graphics"
-msgstr "https://downloadcenter.intel.com/es/product/80939/Graphics"
-
-#. Key:	DriverDownloadLinkNVIDIA
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(198)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(198)
-msgctxt "MessageDialog,DriverDownloadLinkNVIDIA"
-msgid "https://www.nvidia.com/en-us/geforce/drivers/"
-msgstr "https://www.nvidia.com/es-es/geforce/drivers/"
-
-#. Key:	LatestVideoCardDriverIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(230)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(230)
-msgctxt "MessageDialog,LatestVideoCardDriverIssueReport"
-msgid "The latest version of the {Vendor} graphics driver has known issues.\nPlease install the recommended driver version.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "La versión más reciente del controlador de tarjetas gráficas {Vendor} tiene problemas conocidos.\nInstala la versión recomendada del controlador.\n\n¿Quieres visitar la siguiente URL para descargar el controlador?\n\n{Hyperlink}\n\n{AdapterName}\nVersión instalada: {InstalledVer}\nVersión recomendada: {RecommendedVer}"
-
-#. Key:	LatestVideoCardDriverRHIIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(226)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(226)
-msgctxt "MessageDialog,LatestVideoCardDriverRHIIssueReport"
-msgid "The latest version of the {Vendor} graphics driver has known issues in {RHI}.\nPlease install the recommended driver version or switch to a different rendering API.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "La versión más reciente del controlador de tarjetas gráficas {Vendor} tiene problemas conocidos en {RHI}.\nInstala la versión recomendada del controlador o cambia a una API de renderización diferente.\n\n¿Quieres visitar la siguiente URL para descargar el controlador?\n\n{Hyperlink}\n\n{AdapterName}\nVersión instalada: {InstalledVer}\nVersión recomendada: {RecommendedVer}"
-
-#. Key:	TitleVideoCardDriverIssue
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(245)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(245)
-msgctxt "MessageDialog,TitleVideoCardDriverIssue"
-msgid "WARNING: Known issues with graphics driver"
-msgstr "ATENCIÓN: Problemas conocidos con los controladores gráficos"
-
-#. Key:	UpdateMacOSX_Body
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(280)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(280)
-msgctxt "MessageDialog,UpdateMacOSX_Body"
-msgid "Please update to the latest version of macOS for best performance and stability."
-msgstr "Actualiza a la última versión de macOS para tener mejor rendimiento y estabilidad."
-
-#. Key:	UpdateMacOSX_Title
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(281)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(281)
-msgctxt "MessageDialog,UpdateMacOSX_Title"
-msgid "Update macOS"
-msgstr "Actualizar macOS"
-
-#. Key:	VideoCardDriverIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(241)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(241)
-msgctxt "MessageDialog,VideoCardDriverIssueReport"
-msgid "The installed version of the {Vendor} graphics driver has known issues.\nPlease install either the latest or the recommended driver version.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "La versión instalada del controlador de tarjetas gráficas {Vendor} tiene problemas conocidos.\nInstala la versión más reciente del controlador o la recomendada.\n\n¿Quieres visitar la siguiente URL para descargar el controlador?\n\n{Hyperlink}\n\n{AdapterName}\nVersión instalada: {InstalledVer}\nVersión recomendada: {RecommendedVer}"
-
-#. Key:	VideoCardDriverRHIIssueReport
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(237)
-#: ../../../Engine/Source/Runtime/RHI/Private/DynamicRHI.cpp(237)
-msgctxt "MessageDialog,VideoCardDriverRHIIssueReport"
-msgid "The installed version of the {Vendor} graphics driver has known issues in {RHI}.\nPlease install either the latest or the recommended driver version or switch to a different rendering API.\n\nWould you like to visit the following URL to download the driver?\n\n{Hyperlink}\n\n{AdapterName}\nInstalled: {InstalledVer}\nRecommended: {RecommendedVer}"
-msgstr "La versión instalada del controlador de tarjetas gráficas {Vendor} tiene problemas conocidos en {RHI}.\nInstala la versión más reciente del controlador o la recomendada, o cambia a una API de renderización diferente.\n\n¿Quieres visitar la siguiente URL para descargar el controlador?\n\n{Hyperlink}\n\n{AdapterName}\nVersión instalada: {InstalledVer}\nVersión recomendada: {RecommendedVer}"
-
-#. Key:	DebugGameName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(347)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(347)
-msgctxt "UnrealBuildConfigurations,DebugGameName"
-msgid "DebugGame"
-msgstr "Depurar juego"
-
-#. Key:	DebugName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(344)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(344)
-msgctxt "UnrealBuildConfigurations,DebugName"
-msgid "Debug"
-msgstr "Depuración"
-
-#. Key:	DevelopmentName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(350)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(350)
-msgctxt "UnrealBuildConfigurations,DevelopmentName"
-msgid "Development"
-msgstr "Desarrollo"
-
-#. Key:	ShippingName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(353)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(353)
-msgctxt "UnrealBuildConfigurations,ShippingName"
-msgid "Shipping"
-msgstr "Envío"
-
-#. Key:	TestName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(356)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(356)
-msgctxt "UnrealBuildConfigurations,TestName"
-msgid "Test"
-msgstr "Probar"
-
-#. Key:	UnknownName
-#. SourceLocation:	../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(359)
-#: ../../../Engine/Source/Runtime/Core/Private/GenericPlatform/GenericPlatformMisc.cpp(359)
-msgctxt "UnrealBuildConfigurations,UnknownName"
-msgid "Unknown"
-msgstr "Desconocido"
-
-#. Key:	MissingTargetedShaderFormats
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(653)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(653)
-msgctxt "WindowsDynamicRHI,MissingTargetedShaderFormats"
-msgid "Unable to launch with RHI '{0}' since the project is not configured to support it."
-msgstr ""
-
-#. Key:	RequiredDX11Feature_11_SM5
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(739)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(739)
-msgctxt "WindowsDynamicRHI,RequiredDX11Feature_11_SM5"
-msgid "A D3D11-compatible GPU (Feature Level 11.0, Shader Model 5.0) is required to run the engine."
-msgstr "Se requiere una GPU compatible con D3D11 (nivel 11.0, Shader Model 5.0) para ejecutar el procesador."
-
-#. Key:	RequiredDX12
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(713)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(713)
-msgctxt "WindowsDynamicRHI,RequiredDX12"
-msgid "DirectX 12 is not supported on your system. Try running without the -dx12 or -d3d12 command line argument."
-msgstr ""
-
-#. Key:	RequiredDX12SM6
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(684)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(684)
-msgctxt "WindowsDynamicRHI,RequiredDX12SM6"
-msgid "DirectX 12 with Feature Level SM6 is not supported on your system. Try running without the -sm6 command line argument."
-msgstr ""
-
-#. Key:	RequiredOpenGL
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(751)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(751)
-msgctxt "WindowsDynamicRHI,RequiredOpenGL"
-msgid "OpenGL 4.3 is required to run the engine."
-msgstr "Se requiere OpenGL 4.3 para ejecutar el procesador."
-
-#. Key:	RequiredVulkan
-#. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(745)
-#: ../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(745)
-msgctxt "WindowsDynamicRHI,RequiredVulkan"
-msgid "Vulkan Driver is required to run the engine."
-msgstr "Se requiere el controlador Vulkan para ejecutar el motor."
 
 #. Key:	RHIOptionsError
 #. SourceLocation:	../../../Engine/Source/Runtime/RHI/Private/Windows/WindowsDynamicRHI.cpp(562)

@@ -265,7 +265,7 @@ void UAimAssistTargetManagerComponent::GetVisibleTargets(const FAimAssistFilter&
 			return (TargetA.SortScore > TargetB.SortScore);
 		});
 		
-		OutNewTargets.SetNum(Settings.MaxNumberOfTargets, false);
+		OutNewTargets.SetNum(Settings.MaxNumberOfTargets, EAllowShrinking::No);
 	}
 
 	// Do visibliity traces on the targets
