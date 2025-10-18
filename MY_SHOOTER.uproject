@@ -343,6 +343,14 @@
 		{
 			"Name": "NiagaraFluids",
 			"Enabled": true
+		},
+		{
+			"Name": "PlasticSourceControl",
+			"Enabled": false
+		},
+		{
+			"Name": "XRBase",
+			"Enabled": false
 		}
 	],
 	"EpicSampleNameHash": "451731683"

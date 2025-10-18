@@ -9,8 +9,6 @@
 #include "LyraHeroComponent.generated.h"
 
 namespace EEndPlayReason { enum Type : int; }
-struct FLoadedMappableConfigPair;
-struct FMappableConfigPair;
 
 class UGameFrameworkComponentManager;
 class UInputComponent;
@@ -86,22 +84,13 @@ protected:
 	void Input_AutoRun(const FInputActionValue& InputActionValue);
 
 	TSubclassOf<ULyraCameraMode> DetermineCameraMode() const;
-	
-	void OnInputConfigActivated(const FLoadedMappableConfigPair& ConfigPair);
-	void OnInputConfigDeactivated(const FLoadedMappableConfigPair& ConfigPair);
 
 protected:
 
-	/**
-	 * Input Configs that should be added to this player when initializing the input. These configs
-	 * will NOT be registered with the settings because they are added at runtime. If you want the config
-	 * pair to be in the settings, then add it via the GameFeatureAction_AddInputConfig
-	 * 
-	 * NOTE: You should only add to this if you do not have a game feature plugin accessible to you.
-	 * If you do, then use the GameFeatureAction_AddInputConfig instead. 
-	 */
-	UPROPERTY(EditAnywhere)
-	TArray<FMappableConfigPair> DefaultInputConfigs;
+	// DEPRECATED: DefaultInputConfigs removed for UE 5.5
+	// The old PlayerMappableInputConfig system has been removed in UE 5.5.
+	// Input configs are now loaded through the PawnData's InputConfig directly.
+	// Use GameFeatureAction_AddInputConfig for adding input configs at runtime.
 	
 	/** Camera mode set by an ability. */
 	UPROPERTY()
