@@ -59,9 +59,9 @@ void ULyraGameFeaturePolicy::GetGameFeatureLoadingMode(bool& bLoadClientData, bo
 	bLoadServerData = !IsRunningClientOnly();
 }
 
-bool ULyraGameFeaturePolicy::IsPluginAllowed(const FString& PluginURL) const
+bool ULyraGameFeaturePolicy::IsPluginAllowed(const FString& PluginURL, FString* OutReason) const
 {
-	return Super::IsPluginAllowed(PluginURL);
+	return Super::IsPluginAllowed(PluginURL, OutReason);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -132,7 +132,7 @@ void ULyraGameFeature_AddGameplayCuePaths::OnGameFeatureUnregistering(const UGam
 	const FString PluginRootPath = TEXT("/") + PluginName;
 	for (const UGameFeatureAction* Action : GameFeatureData->GetActions())
 	{
-		if (const UGameFeatureAction_AddGameplayCuePath* AddGameplayCueGFA = Cast<UGameFeatureAction_AddGameplayCuePath>(GameFeatureData))
+		if (const UGameFeatureAction_AddGameplayCuePath* AddGameplayCueGFA = Cast<UGameFeatureAction_AddGameplayCuePath>(Action))
 		{
 			const TArray<FDirectoryPath>& DirsToAdd = AddGameplayCueGFA->GetDirectoryPathsToAdd();
 			
