@@ -21,7 +21,6 @@
 #include "SourceCodeNavigation.h"
 #include "SourceControlOperations.h"
 #include "Stats/StatsMisc.h"
-#include "StudioAnalytics.h"
 #include "UObject/UObjectIterator.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(EditorValidator)
@@ -41,8 +40,6 @@ UEditorValidator::UEditorValidator()
 
 void UEditorValidator::ValidateCheckedOutContent(bool bInteractive, const EDataValidationUsecase InValidationUsecase)
 {
-	FStudioAnalytics::RecordEvent(TEXT("ValidateContent"));
-
 	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
 	if (AssetRegistryModule.Get().IsLoadingAssets())
 	{

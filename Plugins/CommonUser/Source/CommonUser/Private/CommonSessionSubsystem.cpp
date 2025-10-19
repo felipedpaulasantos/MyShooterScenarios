@@ -607,7 +607,7 @@ void UCommonSessionSubsystem::CreateOnlineSessionInternalOSSv2(ULocalPlayer* Loc
 
 void UCommonSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	UE_LOG(LogCommonSession, Log, TEXT("OnCreateSessionComplete(SessionName: %s, bWasSuccessful: %d)"), *SessionName.ToString(), bWasSuccessful);
+	UE_LOG(LogCommonSession, Log, TEXT("OnCreateSessionComplete(SessionName: %s, bWasSuccessful: %s)"), *SessionName.ToString(), bWasSuccessful ? TEXT("true") : TEXT("false"));
 
 #if COMMONUSER_OSSV1 // OSSv2 joins splitscreen players as part of the create call
 	// Add the splitscreen player if one exists
@@ -623,11 +623,11 @@ void UCommonSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool bW
 	}
 	else
 #endif
-#endif
 	{
 		// We either failed or there is only a single local user
 		FinishSessionCreation(bWasSuccessful);
 	}
+#endif // COMMONUSER_OSSV1
 }
 
 #if COMMONUSER_OSSV1
@@ -638,7 +638,7 @@ void UCommonSessionSubsystem::OnRegisterLocalPlayerComplete_CreateSession(const 
 
 void UCommonSessionSubsystem::OnStartSessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	UE_LOG(LogCommonSession, Log, TEXT("OnStartSessionComplete(SessionName: %s, bWasSuccessful: %d)"), *SessionName.ToString(), bWasSuccessful);
+	UE_LOG(LogCommonSession, Log, TEXT("OnStartSessionComplete(SessionName: %s, bWasSuccessful: %s)"), *SessionName.ToString(), bWasSuccessful ? TEXT("true") : TEXT("false"));
 
 	if (bWantToDestroyPendingSession)
 	{
@@ -681,7 +681,7 @@ void UCommonSessionSubsystem::FinishSessionCreation(bool bWasSuccessful)
 #if COMMONUSER_OSSV1
 void UCommonSessionSubsystem::OnUpdateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	UE_LOG(LogCommonSession, Log, TEXT("OnUpdateSessionComplete(SessionName: %s, bWasSuccessful: %d"), *SessionName.ToString(), bWasSuccessful ? TEXT("true") : TEXT("false"));
+	UE_LOG(LogCommonSession, Log, TEXT("OnUpdateSessionComplete(SessionName: %s, bWasSuccessful: %s)"), *SessionName.ToString(), bWasSuccessful ? TEXT("true") : TEXT("false"));
 }
 
 void UCommonSessionSubsystem::OnEndSessionComplete(FName SessionName, bool bWasSuccessful)
@@ -1423,4 +1423,3 @@ void UCommonSessionSubsystem::HandlePostLoadMap(UWorld* World)
 }
 
 #undef LOCTEXT_NAMESPACE
-

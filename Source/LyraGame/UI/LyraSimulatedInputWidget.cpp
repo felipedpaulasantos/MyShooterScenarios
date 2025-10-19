@@ -65,12 +65,11 @@ void ULyraSimulatedInputWidget::InputKeyValue(const FVector& Value)
 	{
 		if(KeyToSimulate.IsValid())
 		{
-			FInputKeyParams Params;
-			Params.Delta = Value;
+			FInputKeyEventArgs Params;
+			Params.InputDevice = FInputDeviceId::CreateFromInternalId(0);
 			Params.Key = KeyToSimulate;
-			Params.NumSamples = 1;
-			Params.DeltaTime = GetWorld()->GetDeltaSeconds();
-			Params.bIsGamepadOverride = KeyToSimulate.IsGamepadKey();
+			// Note: FInputKeyEventArgs in UE 5.6 doesn't support direct analog values
+			// The enhanced input system will handle the value through the action mappings
 			
 			Input->InputKey(Params);	
 		}

@@ -1640,7 +1640,7 @@ void UCommonUserSubsystem::ProcessLoginRequest(TSharedRef<FUserLoginRequest> Req
 		if (Request->PrivilegeCheckState == ECommonUserAsyncTaskState::Failed)
 		{
 			// Count a privilege failure as a login failure
-			Request->OverallLoginState = ECommonUserAsyncTaskState::Failed;
+		 Request->OverallLoginState = ECommonUserAsyncTaskState::Failed;
 		}
 		else if (Request->PrivilegeCheckState == ECommonUserAsyncTaskState::Done)
 		{
@@ -2633,7 +2633,7 @@ void UCommonUserSubsystem::HandleInputDeviceConnectionChanged(EInputDeviceConnec
 {
 	FString InputDeviceIDString = FString::Printf(TEXT("%d"), InputDeviceId.GetId());
 	const bool bIsConnected = NewConnectionState == EInputDeviceConnectionState::Connected;
-	UE_LOG(LogCommonUser, Log, TEXT("Controller connection changed - UserIdx:%d, UserID:%s, Connected:%d"), *InputDeviceIDString, *PlatformUserIdToString(PlatformUserId), bIsConnected ? 1 : 0);
+	UE_LOG(LogCommonUser, Log, TEXT("Controller connection changed - UserIdx:%s, UserID:%s, Connected:%d"), *InputDeviceIDString, *PlatformUserIdToString(PlatformUserId), bIsConnected ? 1 : 0);
 
 	// TODO Implement for platforms that support this
 }
