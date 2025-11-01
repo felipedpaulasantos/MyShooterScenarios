@@ -129,6 +129,22 @@ void ULyraCameraMode_ThirdPerson::UpdateView(float DeltaTime)
 	PivotLocation = DesiredLoc;
 	// @Game-Change end add rotation and location lag
 
+	// Capture the rotation before applying custom view offsets (used for ControlRotation)
+	const FRotator PreOffsetPivotRotation = PivotRotation;
+
+	// @Game-Change: apply custom view offsets (rotation/location)
+	if (!ViewRotationOffset.IsNearlyZero())
+	{
+		PivotRotation = (PivotRotation + ViewRotationOffset).GetNormalized();
+	}
+
+	if (!ViewLocationOffset.IsNearlyZero())
+	{
+		PivotLocation += bOffsetInPivotSpace
+			? PivotRotation.RotateVector(ViewLocationOffset)
+			: ViewLocationOffset;
+	}
+
 	// Apply third person offset using pitch.
 	if (!bUseRuntimeFloatCurves)
 	{
@@ -148,6 +164,10 @@ void ULyraCameraMode_ThirdPerson::UpdateView(float DeltaTime)
 
 		View.Location = PivotLocation + PivotRotation.RotateVector(TargetOffset);
 	}
+
+	// Make sure View uses the updated pivot and preserve original control rotation (pre-offset)
+	View.Rotation = PivotRotation;
+	View.ControlRotation = PreOffsetPivotRotation;
 
 	// Adjust final desired camera location to prevent any penetration
 	UpdatePreventPenetration(DeltaTime);
@@ -452,4 +472,3 @@ void ULyraCameraMode_ThirdPerson::UpdateCrouchOffset(float DeltaTime)
 		CrouchOffsetBlendPct = 1.0f;
 	}
 }
-

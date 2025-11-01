@@ -163,4 +163,17 @@ protected:
 	float CrouchOffsetBlendPct = 1.0f;
 	FVector CurrentCrouchOffset = FVector::ZeroVector;
 	
+	// @Game-Change: Customizable view offsets (exposed to BP)
+public:
+	/** Additional rotation offset applied to the computed pivot/view (applied before TargetOffset curve). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Third Person|View Offset")
+	FRotator ViewRotationOffset = FRotator::ZeroRotator;
+
+	/** Additional location offset applied at the pivot (local if bOffsetInPivotSpace is true). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Third Person|View Offset")
+	FVector ViewLocationOffset = FVector::ZeroVector;
+
+	/** If true, ViewLocationOffset is interpreted in pivot local space; otherwise in world space. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Third Person|View Offset")
+	bool bOffsetInPivotSpace = true;
 };
