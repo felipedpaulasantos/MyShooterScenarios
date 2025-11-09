@@ -43,6 +43,7 @@ public:
 	TArray<TObjectPtr<ULyraInventoryItemFragment>> Fragments;
 
 public:
+	UFUNCTION(BlueprintCallable, BlueprintPure, meta=(DeterminesOutputType=FragmentClass))
 	const ULyraInventoryItemFragment* FindFragmentByClass(TSubclassOf<ULyraInventoryItemFragment> FragmentClass) const;
 };
 

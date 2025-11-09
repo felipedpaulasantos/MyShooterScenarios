@@ -68,6 +68,16 @@ public:
 		return BulletTraceSweepRadius;
 	}
 
+	// Blueprint-exposed functions to access MaterialDamageMultiplier
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon")
+	float GetMaterialDamageMultiplier(FGameplayTag MaterialTag) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon")
+	TMap<FGameplayTag, float> GetAllMaterialDamageMultipliers() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Weapon")
+	void SetMaterialDamageMultiplier(FGameplayTag MaterialTag, float Multiplier);
+
 protected:
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(VisibleAnywhere, Category = "Spread|Fire Params")

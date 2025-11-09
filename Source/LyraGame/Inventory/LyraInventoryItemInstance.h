@@ -45,6 +45,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category=Inventory)
 	bool HasStatTag(FGameplayTag Tag) const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category=Inventory)
 	TSubclassOf<ULyraInventoryItemDefinition> GetItemDef() const
 	{
 		return ItemDef;
@@ -70,10 +71,10 @@ private:
 	friend struct FLyraInventoryList;
 
 private:
-	UPROPERTY(Replicated)
+	UPROPERTY(Replicated, BlueprintReadOnly, Category=Inventory, meta=(AllowPrivateAccess="true"))
 	FGameplayTagStackContainer StatTags;
 
 	// The item definition
-	UPROPERTY(Replicated)
+	UPROPERTY(Replicated, BlueprintReadOnly, Category=Inventory, meta=(AllowPrivateAccess="true"))
 	TSubclassOf<ULyraInventoryItemDefinition> ItemDef;
 };

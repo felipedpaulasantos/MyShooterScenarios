@@ -146,6 +146,25 @@ float ULyraRangedWeaponInstance::GetPhysicalMaterialAttenuation(const UPhysicalM
 	return CombinedMultiplier;
 }
 
+float ULyraRangedWeaponInstance::GetMaterialDamageMultiplier(FGameplayTag MaterialTag) const
+{
+	if (const float* pMultiplier = MaterialDamageMultiplier.Find(MaterialTag))
+	{
+		return *pMultiplier;
+	}
+	return 1.0f; // Default multiplier if tag not found
+}
+
+TMap<FGameplayTag, float> ULyraRangedWeaponInstance::GetAllMaterialDamageMultipliers() const
+{
+	return MaterialDamageMultiplier;
+}
+
+void ULyraRangedWeaponInstance::SetMaterialDamageMultiplier(FGameplayTag MaterialTag, float Multiplier)
+{
+	MaterialDamageMultiplier.Add(MaterialTag, Multiplier);
+}
+
 bool ULyraRangedWeaponInstance::UpdateSpread(float DeltaSeconds)
 {
 	const float TimeSinceFired = GetWorld()->TimeSince(LastFireTime);

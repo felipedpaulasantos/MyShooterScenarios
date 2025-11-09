@@ -47,14 +47,18 @@ struct FLyraInventoryEntry : public FFastArraySerializerItem
 
 	FString GetDebugString() const;
 
+	ULyraInventoryItemInstance* GetInstance() const { return Instance; }
+
+	int32 GetStackCount() const { return StackCount; }
+
 private:
 	friend FLyraInventoryList;
 	friend ULyraInventoryManagerComponent;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadOnly, Category=Inventory, meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ULyraInventoryItemInstance> Instance = nullptr;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadOnly, Category=Inventory, meta=(AllowPrivateAccess="true"))
 	int32 StackCount = 0;
 
 	UPROPERTY(NotReplicated)
@@ -155,8 +159,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category=Inventory, BlueprintPure)
 	ULyraInventoryItemInstance* FindFirstItemStackByDefinition(TSubclassOf<ULyraInventoryItemDefinition> ItemDef) const;
 
+	UFUNCTION(BlueprintCallable, Category=Inventory, BlueprintPure)
 	int32 GetTotalItemCountByDefinition(TSubclassOf<ULyraInventoryItemDefinition> ItemDef) const;
+	
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category=Inventory)
 	bool ConsumeItemsByDefinition(TSubclassOf<ULyraInventoryItemDefinition> ItemDef, int32 NumToConsume);
+
+	UFUNCTION(BlueprintCallable, Category=Inventory, BlueprintPure)
+	int32 GetItemStackCount(ULyraInventoryItemInstance* ItemInstance) const;
 
 	//~UObject interface
 	virtual bool ReplicateSubobjects(class UActorChannel* Channel, class FOutBunch* Bunch, FReplicationFlags* RepFlags) override;

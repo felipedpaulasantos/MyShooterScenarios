@@ -264,6 +264,18 @@ bool ULyraInventoryManagerComponent::ConsumeItemsByDefinition(TSubclassOf<ULyraI
 	return TotalConsumed == NumToConsume;
 }
 
+int32 ULyraInventoryManagerComponent::GetItemStackCount(ULyraInventoryItemInstance* ItemInstance) const
+{
+	for (const FLyraInventoryEntry& Entry : InventoryList.Entries)
+	{
+		if (Entry.Instance == ItemInstance)
+		{
+			return Entry.StackCount;
+		}
+	}
+	return 0;
+}
+
 void ULyraInventoryManagerComponent::ReadyForReplication()
 {
 	Super::ReadyForReplication();
