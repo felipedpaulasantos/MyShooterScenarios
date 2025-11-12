@@ -10,6 +10,7 @@
 #include "Interfaces/OnlineSessionDelegates.h"
 #include "Online/OnlineSessionNames.h"
 #include "OnlineSessionSettings.h"
+#include "UObject/ObjectPtr.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(CommonSessionSubsystem)
 
@@ -137,29 +138,18 @@ int32 UCommonSession_SearchResult::GetPingInMs() const
 #endif //COMMONUSER_OSSV1
 
 
-class FCommonOnlineSearchSettingsBase : public FGCObject
+class FCommonOnlineSearchSettingsBase
 {
 public:
 	FCommonOnlineSearchSettingsBase(UCommonSession_SearchSessionRequest* InSearchRequest)
 	{
-		SearchRequest = InSearchRequest;
+		SearchRequest = TStrongObjectPtr<UCommonSession_SearchSessionRequest>(InSearchRequest);
 	}
 
 	virtual ~FCommonOnlineSearchSettingsBase() {}
 
-	virtual void AddReferencedObjects(FReferenceCollector& Collector) override
-	{
-		Collector.AddReferencedObject(SearchRequest);
-	}
-
-	virtual FString GetReferencerName() const override
-	{
-		static const FString NameString = TEXT("FCommonOnlineSearchSettings");
-		return NameString;
-	}
-
 public:
-	UCommonSession_SearchSessionRequest* SearchRequest = nullptr;
+	TStrongObjectPtr<UCommonSession_SearchSessionRequest> SearchRequest;
 };
 
 #if COMMONUSER_OSSV1
@@ -206,7 +196,6 @@ public:
 		QuerySettings.Set(SETTING_ONLINESUBSYSTEM_VERSION, true, EOnlineComparisonOp::Equals);
 		if (InSearchRequest->bUseLobbies)
 		{
-			QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
 			QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
 		}
 	}
@@ -227,7 +216,7 @@ public:
 
 		if (InSearchRequest->bUseLobbies)
 		{
-			FindLobbyParams.Filters.Emplace(FFindLobbySearchFilter{ SEARCH_PRESENCE, ESchemaAttributeComparisonOp::Equals, true });
+			// No need for deprecated SEARCH_PRESENCE filter in OSSv2
 		}
 	}
 public:
@@ -589,8 +578,7 @@ void UCommonSessionSubsystem::CreateOnlineSessionInternalOSSv2(ULocalPlayer* Loc
 	CreateParams.Attributes.Emplace(SETTING_ONLINESUBSYSTEM_VERSION, true);
 	if (bIsPresence)
 	{
-		// Add presence setting so it can be searched for
-		CreateParams.Attributes.Emplace(SEARCH_PRESENCE, true);
+		// Deprecated SEARCH_PRESENCE attribute removed; presence is implicit with lobbies in OSSv2
 	}
 
 	CreateParams.UserAttributes.Emplace(SETTING_GAMEMODE, FString(TEXT("GameSession")));
@@ -795,7 +783,7 @@ void UCommonSessionSubsystem::FindSessionsInternalOSSv2(ULocalPlayer* LocalPlaye
 				}
 				else
 				{
-					UCommonSession_SearchResult* Entry = NewObject<UCommonSession_SearchResult>(SearchSettings->SearchRequest);
+					UCommonSession_SearchResult* Entry = NewObject<UCommonSession_SearchResult>(SearchSettings->SearchRequest.Get());
 					Entry->Lobby = Lobby;
 					SearchSettings->SearchRequest->Results.Add(Entry);
 
@@ -1010,7 +998,7 @@ void UCommonSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 		for (const FOnlineSessionSearchResult& Result : SearchSettingsV1.SearchResults)
 		{
-			UCommonSession_SearchResult* Entry = NewObject<UCommonSession_SearchResult>(SearchSettingsV1.SearchRequest);
+			UCommonSession_SearchResult* Entry = NewObject<UCommonSession_SearchResult>(SearchSettingsV1.SearchRequest.Get());
 			Entry->Result = Result;
 			SearchSettingsV1.SearchRequest->Results.Add(Entry);
 			FString OwningUserId = TEXT("Unknown");
@@ -1033,25 +1021,24 @@ void UCommonSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		SearchSettingsV1.SearchRequest->Results.Empty();
 	}
 
-	if (0)
-	{
-		// Fake Sessions OSSV1
-		for (int i = 0; i < 10; i++)
-		{
-			UCommonSession_SearchResult* Entry = NewObject<UCommonSession_SearchResult>(SearchSettings->SearchRequest);
-			FOnlineSessionSearchResult FakeResult;
-			FakeResult.Session.OwningUserName = TEXT("Fake User");
-			FakeResult.Session.SessionSettings.NumPublicConnections = 10;
-			FakeResult.Session.SessionSettings.bShouldAdvertise = true;
-			FakeResult.Session.SessionSettings.bAllowJoinInProgress = true;
-			FakeResult.PingInMs=99;
-			Entry->Result = FakeResult;
-			SearchSettingsV1.SearchRequest->Results.Add(Entry);
-		}
-	}
-	
-	SearchSettingsV1.SearchRequest->NotifySearchFinished(bWasSuccessful, bWasSuccessful ? FText() : LOCTEXT("Error_FindSessionV1Failed", "Find session failed"));
-	SearchSettings.Reset();
+#if 0
+    // Fake Sessions OSSV1
+    for (int i = 0; i < 10; i++)
+    {
+		UCommonSession_SearchResult* Entry = NewObject<UCommonSession_SearchResult>(SearchSettings->SearchRequest.Get());
+        FOnlineSessionSearchResult FakeResult;
+        FakeResult.Session.OwningUserName = TEXT("Fake User");
+        FakeResult.Session.SessionSettings.NumPublicConnections = 10;
+        FakeResult.Session.SessionSettings.bShouldAdvertise = true;
+        FakeResult.Session.SessionSettings.bAllowJoinInProgress = true;
+        FakeResult.PingInMs=99;
+        Entry->Result = FakeResult;
+        SearchSettingsV1.SearchRequest->Results.Add(Entry);
+    }
+#endif
+    
+    SearchSettingsV1.SearchRequest->NotifySearchFinished(bWasSuccessful, bWasSuccessful ? FText() : LOCTEXT("Error_FindSessionV1Failed", "Find session failed"));
+    SearchSettings.Reset();
 }
 #endif // COMMONUSER_OSSV1
 
