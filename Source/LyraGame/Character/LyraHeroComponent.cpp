@@ -421,14 +421,44 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 	const UWorld* World = GetWorld();
 	check(World);
 
+	// Optional acceleration ramp for smoother start when using right stick
+	float Scale = 1.0f;
+	if (bLookStickAccelerationEnabled)
+	{
+		const float Magnitude = Value.Size();
+
+		// Reset when the stick is nearly centered
+		if (Magnitude < LookStickResetThreshold)
+		{
+			LookStickAccelAlpha = 0.0f;
+		}
+		else
+		{
+			if (LookStickAccelTimeToMax <= KINDA_SMALL_NUMBER)
+			{
+				LookStickAccelAlpha = 1.0f;
+			}
+			else
+			{
+				LookStickAccelAlpha = FMath::Clamp(LookStickAccelAlpha + (World->GetDeltaSeconds() / LookStickAccelTimeToMax), 0.0f, 1.0f);
+			}
+
+			// Ease from StartScale to 1 using smoothstep (ease-in)
+			const float Eased = FMath::InterpEaseInOut(LookStickAccelStartScale, 1.0f, LookStickAccelAlpha, 1.5f);
+			Scale = FMath::Clamp(Eased, 0.0f, 1.0f);
+		}
+
+		LookStickPrevMagnitude = Magnitude;
+	}
+
 	if (Value.X != 0.0f)
 	{
-		Pawn->AddControllerYawInput(Value.X * LyraHero::LookYawRate * World->GetDeltaSeconds());
+		Pawn->AddControllerYawInput(Value.X * LyraHero::LookYawRate * World->GetDeltaSeconds() * Scale);
 	}
 
 	if (Value.Y != 0.0f)
 	{
-		Pawn->AddControllerPitchInput(Value.Y * LyraHero::LookPitchRate * World->GetDeltaSeconds());
+		Pawn->AddControllerPitchInput(Value.Y * LyraHero::LookPitchRate * World->GetDeltaSeconds() * Scale);
 	}
 }
 

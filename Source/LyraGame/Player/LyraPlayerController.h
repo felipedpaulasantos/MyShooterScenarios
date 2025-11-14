@@ -77,7 +77,9 @@ public:
 	//~End of ACommonPlayerController interface
 	
 	//~ILyraTeamAgentInterface interface
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Team")
 	virtual void SetGenericTeamId(const FGenericTeamId& NewTeamID) override;
+	UFUNCTION(BlueprintPure, Category = "Lyra|Team")
 	virtual FGenericTeamId GetGenericTeamId() const override;
 	virtual FOnLyraTeamIndexChangedDelegate* GetOnTeamIndexChangedDelegate() override;
 	//~End of ILyraTeamAgentInterface interface
@@ -85,7 +87,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Character")
 	void SetIsAutoRunning(const bool bEnabled);
 
-	UFUNCTION(BlueprintCallable, Category = "Lyra|Character")
+	UFUNCTION(BlueprintPure, Category = "Lyra|Character")
 	bool GetIsAutoRunning() const;
 
 private:
@@ -101,6 +103,7 @@ private:
 
 protected:
 	// Called when the player state is set or cleared
+	UFUNCTION(BlueprintCallable, Category="Lyra|PlayerController", meta=(BlueprintProtected="true"))
 	virtual void OnPlayerStateChanged();
 
 private:
@@ -124,9 +127,12 @@ protected:
 	virtual void PostProcessInput(const float DeltaTime, const bool bGamePaused) override;
 	//~End of APlayerController interface
 
+	UFUNCTION(BlueprintCallable, Category="Lyra|Settings", meta=(BlueprintProtected="true"))
 	void OnSettingsChanged(ULyraSettingsShared* Settings);
 	
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	void OnStartAutoRun();
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	void OnEndAutoRun();
 
 	UFUNCTION(BlueprintImplementableEvent, meta=(DisplayName="OnStartAutoRun"))

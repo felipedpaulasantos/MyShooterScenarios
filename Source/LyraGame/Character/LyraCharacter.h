@@ -37,13 +37,13 @@ struct FLyraReplicatedAcceleration
 	GENERATED_BODY()
 
 	UPROPERTY()
-	uint8 AccelXYRadians = 0;	// Direction of XY accel component, quantized to represent [0, 2*pi]
+	uint8 AccelXYRadians = 0; // Direction of XY accel component, quantized to represent [0, 2*pi]
 
 	UPROPERTY()
-	uint8 AccelXYMagnitude = 0;	//Accel rate of XY component, quantized to represent [0, MaxAcceleration]
+	uint8 AccelXYMagnitude = 0; //Accel rate of XY component, quantized to represent [0, MaxAcceleration]
 
 	UPROPERTY()
-	int8 AccelZ = 0;	// Raw Z accel rate component, quantized to represent [-MaxAcceleration, MaxAcceleration]
+	int8 AccelZ = 0; // Raw Z accel rate component, quantized to represent [-MaxAcceleration, MaxAcceleration]
 };
 
 /** The type we use to send FastShared movement updates. */
@@ -111,11 +111,16 @@ public:
 	ULyraAbilitySystemComponent* GetLyraAbilitySystemComponent() const;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	virtual void GetOwnedGameplayTags(FGameplayTagContainer& TagContainer) const override;
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character|Tags")
+	virtual void GetOwnedGameplayTags(UPARAM(ref) FGameplayTagContainer& TagContainer) const override;
+	UFUNCTION(BlueprintPure, Category = "Lyra|Character|Tags")
 	virtual bool HasMatchingGameplayTag(FGameplayTag TagToCheck) const override;
+	UFUNCTION(BlueprintPure, Category = "Lyra|Character|Tags")
 	virtual bool HasAllMatchingGameplayTags(const FGameplayTagContainer& TagContainer) const override;
+	UFUNCTION(BlueprintPure, Category = "Lyra|Character|Tags")
 	virtual bool HasAnyMatchingGameplayTags(const FGameplayTagContainer& TagContainer) const override;
 
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character")
 	void ToggleCrouch();
 
 	//~AActor interface
@@ -132,7 +137,9 @@ public:
 	//~End of APawn interface
 
 	//~ILyraTeamAgentInterface interface
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Team")
 	virtual void SetGenericTeamId(const FGenericTeamId& NewTeamID) override;
+	UFUNCTION(BlueprintPure, Category = "Lyra|Team")
 	virtual FGenericTeamId GetGenericTeamId() const override;
 	virtual FOnLyraTeamIndexChangedDelegate* GetOnTeamIndexChangedDelegate() override;
 	//~End of ILyraTeamAgentInterface interface
@@ -142,13 +149,17 @@ public:
 	void FastSharedReplication(const FSharedRepMovement& SharedRepMovement);
 
 	// Last FSharedRepMovement we sent, to avoid sending repeatedly.
+	UPROPERTY()
 	FSharedRepMovement LastSharedReplication;
 
+	UFUNCTION(BlueprintCallable, Category="Lyra|Movement")
 	virtual bool UpdateSharedReplication();
 
 protected:
 
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	virtual void OnAbilitySystemInitialized();
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	virtual void OnAbilitySystemUninitialized();
 
 	virtual void PossessedBy(AController* NewController) override;
@@ -159,20 +170,24 @@ protected:
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	void InitializeGameplayTags();
 
 	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 
 	// Begins the death sequence for the character (disables collision, disables movement, etc...)
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character|Death")
 	virtual void OnDeathStarted(AActor* OwningActor);
 
 	// Ends the death sequence for the character (detaches controller, destroys pawn, etc...)
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character|Death")
 	virtual void OnDeathFinished(AActor* OwningActor);
 
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	void DisableMovementAndCollision();
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	void DestroyDueToDeath();
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character", meta=(BlueprintProtected="true"))
 	void UninitAndDestroy();
 
 	// Called when the death sequence for the character has completed
@@ -180,11 +195,13 @@ protected:
 	void K2_OnDeathFinished();
 
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Character|Movement", meta=(BlueprintProtected="true"))
 	void SetMovementModeTag(EMovementMode MovementMode, uint8 CustomMovementMode, bool bTagEnabled);
 
 	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 
+	UFUNCTION(BlueprintPure, Category = "Lyra|Character|Movement")
 	virtual bool CanJumpInternal_Implementation() const;
 
 private:
@@ -198,10 +215,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Lyra|Character", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<ULyraCameraComponent> CameraComponent;
 
-	UPROPERTY(Transient, ReplicatedUsing = OnRep_ReplicatedAcceleration)
+	UPROPERTY(Transient, ReplicatedUsing = OnRep_ReplicatedAcceleration, Meta=(AllowPrivateAccess="true"))
 	FLyraReplicatedAcceleration ReplicatedAcceleration;
 
-	UPROPERTY(ReplicatedUsing = OnRep_MyTeamID)
+	UPROPERTY(ReplicatedUsing = OnRep_MyTeamID, BlueprintReadOnly, Category="Lyra|Team", Meta=(AllowPrivateAccess="true"))
 	FGenericTeamId MyTeamID;
 
 	UPROPERTY()
@@ -209,7 +226,9 @@ private:
 
 protected:
 	// Called to determine what happens to the team ID when possession ends
-	virtual FGenericTeamId DetermineNewTeamAfterPossessionEnds(FGenericTeamId OldTeamID) const
+	UFUNCTION(BlueprintNativeEvent, Category = "Lyra|Team")
+	FGenericTeamId DetermineNewTeamAfterPossessionEnds(FGenericTeamId OldTeamID) const;
+	virtual FGenericTeamId DetermineNewTeamAfterPossessionEnds_Implementation(FGenericTeamId OldTeamID) const
 	{
 		// This could be changed to return, e.g., OldTeamID if you want to keep it assigned afterwards, or return an ID for some neutral faction, or etc...
 		return FGenericTeamId::NoTeam;
