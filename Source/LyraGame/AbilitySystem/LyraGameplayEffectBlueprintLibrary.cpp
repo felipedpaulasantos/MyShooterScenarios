@@ -307,15 +307,47 @@ bool ULyraGameplayEffectBlueprintLibrary::GetBaseDamageFromDamageEffect(const UG
 						}
 						else if (EnumValue == 0) // ScalableFloat
 						{
-							// Try to extract ScalableFloat value
+							// Try to extract ScalableFloat value, supporting both direct floats and curves
 							const FProperty* ScalableFloatProp = MagnitudeStruct->FindPropertyByName(TEXT("ScalableFloatMagnitude"));
 							if (ScalableFloatProp)
 							{
 								FScalableFloat ScalableValue;
 								ScalableFloatProp->CopyCompleteValue(&ScalableValue, ScalableFloatProp->ContainerPtrToValuePtr<void>(MagnitudePtr));
+
+								// Log detailed info about the ScalableFloat
+								UE_LOG(LogLyraGEBlueprintLib, Log, TEXT("  ScalableFloat Details:"));
+								UE_LOG(LogLyraGEBlueprintLib, Log, TEXT("    Direct Value: %f"), ScalableValue.Value);
 								
-								OutBaseDamage = ScalableValue.GetValueAtLevel(1.0f);
-								UE_LOG(LogLyraGEBlueprintLib, Log, TEXT("  Successfully extracted BaseDamage from ScalableFloat: %f"), OutBaseDamage);
+								const bool bHasCurveTable = (ScalableValue.Curve.CurveTable != nullptr);
+								UE_LOG(LogLyraGEBlueprintLib, Log, TEXT("    Has Curve Table: %s"), bHasCurveTable ? TEXT("Yes") : TEXT("No"));
+								
+								if (bHasCurveTable)
+								{
+									UE_LOG(LogLyraGEBlueprintLib, Log, TEXT("    Curve Table: %s"), *ScalableValue.Curve.CurveTable->GetName());
+									UE_LOG(LogLyraGEBlueprintLib, Log, TEXT("    Row Name: %s"), *ScalableValue.Curve.RowName.ToString());
+								}
+
+								// Evaluate at level 1.0f as a reasonable default for weapon damage
+								const float EvalLevel = 1.0f;
+								OutBaseDamage = ScalableValue.GetValueAtLevel(EvalLevel);
+
+								UE_LOG(LogLyraGEBlueprintLib, Log, TEXT("  Evaluated ScalableFloat at Level %.2f => BaseDamage = %f"), EvalLevel, OutBaseDamage);
+
+								// If GetValueAtLevel returned 0 but we have a direct Value, use it as fallback
+								if (OutBaseDamage == 0.0f && ScalableValue.Value != 0.0f)
+								{
+									UE_LOG(LogLyraGEBlueprintLib, Warning, TEXT("  GetValueAtLevel returned 0, but direct Value is %.2f. Using direct Value as fallback."), ScalableValue.Value);
+									OutBaseDamage = ScalableValue.Value;
+								}
+
+								if (OutBaseDamage == 0.0f)
+								{
+									UE_LOG(LogLyraGEBlueprintLib, Warning, TEXT("  ScalableFloat evaluation returned 0. This may indicate:"));
+									UE_LOG(LogLyraGEBlueprintLib, Warning, TEXT("    - The curve/table is not set or not loaded on the GE CDO,"));
+									UE_LOG(LogLyraGEBlueprintLib, Warning, TEXT("    - The row name is invalid, or"));
+									UE_LOG(LogLyraGEBlueprintLib, Warning, TEXT("    - The curve value at Level %.2f is actually 0."), EvalLevel);
+								}
+
 								return true;
 							}
 						}
