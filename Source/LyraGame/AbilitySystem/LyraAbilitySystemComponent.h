@@ -31,6 +31,13 @@ public:
 
 	ULyraAbilitySystemComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
+	/**
+	 * Retorna todas as instâncias de abilities ativas que são da classe especificada.
+	 * Útil para Blueprints que precisam acessar abilities de tiro, movimento, etc.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Abilities")
+	void GetActiveAbilitiesWithClass(TSubclassOf<UGameplayAbility> AbilityClass, TArray<UGameplayAbility*>& ActiveAbilities) const;
+
 	//~UActorComponent interface
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	//~End of UActorComponent interface
@@ -68,7 +75,7 @@ public:
 	/** Looks at ability tags and gathers additional required and blocking tags */
 	void GetAdditionalActivationTagRequirements(const FGameplayTagContainer& AbilityTags, FGameplayTagContainer& OutActivationRequired, FGameplayTagContainer& OutActivationBlocked) const;
 
-	/** Retorna o valor base (n�o modificado) de um atributo. */
+	/** Retorna o valor base (n�o modificado) de um atributo. */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Attributes")
 	float GetBaseAttributeValue(FGameplayAttribute Attribute) const;
 

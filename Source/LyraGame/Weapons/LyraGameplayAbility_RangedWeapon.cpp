@@ -81,6 +81,46 @@ ULyraRangedWeaponInstance* ULyraGameplayAbility_RangedWeapon::GetWeaponInstance(
 	return Cast<ULyraRangedWeaponInstance>(GetAssociatedEquipment());
 }
 
+void ULyraGameplayAbility_RangedWeapon::SetRuntimeAccuracySpreadMultiplier(float NewMultiplier)
+{
+	// Clamp to non-negative values; designers can drive this from Blueprint.
+	RuntimeAccuracySpreadMultiplier = FMath::Max(NewMultiplier, 0.0f);
+}
+
+float ULyraGameplayAbility_RangedWeapon::GetEffectiveAccuracyMultiplier() const
+{
+	// By default we don't change Lyra's original behavior at all.
+	if (!bUseAccuracySpreadMultiplier)
+	{
+		return 1.0f;
+	}
+
+	// AccuracySpreadMultiplier is fully optional and only used when the flag above is true.
+	// Designers can change this per-ability instance (e.g., bot abilities) without breaking existing content.
+	const float Base = FMath::Max(AccuracySpreadMultiplier, 0.0f);
+	const float Runtime = FMath::Max(RuntimeAccuracySpreadMultiplier, 0.0f);
+
+	return Base * Runtime;
+}
+
+FTransform ULyraGameplayAbility_RangedWeapon::GetAbilityTargetingTransform(ELyraAbilityTargetingSource Source) const
+{
+	APawn* const AvatarPawn = Cast<APawn>(GetAvatarActorFromActorInfo());
+	if (!AvatarPawn)
+	{
+		return FTransform::Identity;
+	}
+
+	return GetTargetingTransform(AvatarPawn, Source);
+}
+
+void ULyraGameplayAbility_RangedWeapon::GetAbilityAimData(ELyraAbilityTargetingSource Source, FVector& OutStartLocation, FVector& OutAimDirection) const
+{
+	const FTransform TargetTransform = GetAbilityTargetingTransform(Source);
+	OutAimDirection = TargetTransform.GetUnitAxis(EAxis::X);
+	OutStartLocation = TargetTransform.GetTranslation();
+}
+
 bool ULyraGameplayAbility_RangedWeapon::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
 {
 	bool bResult = Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
@@ -388,9 +428,10 @@ void ULyraGameplayAbility_RangedWeapon::TraceBulletsInCartridge(const FRangedWea
 
 	for (int32 BulletIndex = 0; BulletIndex < BulletsPerCartridge; ++BulletIndex)
 	{
+		// Use weapon instance to determine spread fully (heat, movement, aiming, runtime modifiers).
 		const float BaseSpreadAngle = WeaponData->GetCalculatedSpreadAngle();
 		const float SpreadAngleMultiplier = WeaponData->GetCalculatedSpreadAngleMultiplier();
-		const float ActualSpreadAngle = BaseSpreadAngle * SpreadAngleMultiplier;
+		float ActualSpreadAngle = BaseSpreadAngle * SpreadAngleMultiplier;
 
 		const float HalfSpreadAngleInRadians = FMath::DegreesToRadians(ActualSpreadAngle * 0.5f);
 
@@ -596,4 +637,3 @@ void ULyraGameplayAbility_RangedWeapon::StartRangedWeaponTargeting()
 	// Process the target data immediately
 	OnTargetDataReadyCallback(TargetData, FGameplayTag());
 }
-

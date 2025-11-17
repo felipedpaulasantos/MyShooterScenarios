@@ -32,40 +32,58 @@ public:
 	void UpdateDebugVisualization();
 #endif
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Spread")
 	int32 GetBulletsPerCartridge() const
 	{
 		return BulletsPerCartridge;
 	}
 	
 	/** Returns the current spread angle (in degrees, diametrical) */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Spread")
 	float GetCalculatedSpreadAngle() const
 	{
 		return CurrentSpreadAngle;
 	}
 
+	/** Returns the current combined spread multiplier (player state, aiming, etc.). */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Spread")
 	float GetCalculatedSpreadAngleMultiplier() const
 	{
-		return bHasFirstShotAccuracy ? 0.0f : CurrentSpreadAngleMultiplier;
+		return bHasFirstShotAccuracy ? 0.0f : CurrentSpreadAngleMultiplier * RuntimeSpreadMultiplier;
 	}
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Spread")
 	bool HasFirstShotAccuracy() const
 	{
 		return bHasFirstShotAccuracy;
 	}
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Spread")
 	float GetSpreadExponent() const
 	{
 		return SpreadExponent;
 	}
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Config")
 	float GetMaxDamageRange() const
 	{
 		return MaxDamageRange;
 	}
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Config")
 	float GetBulletTraceSweepRadius() const
 	{
 		return BulletTraceSweepRadius;
+	}
+
+	/** Additional runtime spread multiplier that can be adjusted by Blueprint (e.g., bots under specific conditions). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lyra|Weapon|Spread", meta=(ClampMin=0.0))
+	float RuntimeSpreadMultiplier = 1.0f;
+
+	UFUNCTION(BlueprintCallable, Category="Lyra|Weapon|Spread")
+	void SetRuntimeSpreadMultiplier(float NewMultiplier)
+	{
+		RuntimeSpreadMultiplier = FMath::Max(NewMultiplier, 0.0f);
 	}
 
 	// Blueprint-exposed functions to access MaterialDamageMultiplier

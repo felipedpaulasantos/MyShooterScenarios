@@ -43,7 +43,7 @@ enum class ELyraAbilityTargetingSource : uint8
  *
  * An ability granted by and associated with a ranged weapon instance
  */
-UCLASS()
+ UCLASS(Blueprintable)
 class ULyraGameplayAbility_RangedWeapon : public ULyraGameplayAbility_FromEquipment
 {
 	GENERATED_BODY()
@@ -52,8 +52,36 @@ public:
 
 	ULyraGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
-	UFUNCTION(BlueprintCallable, Category="Lyra|Ability")
+	UFUNCTION(BlueprintCallable, Category="Lyra|Ability|RangedWeapon")
 	ULyraRangedWeaponInstance* GetWeaponInstance() const;
+
+	/** Optional accuracy modifier. When > 1.0, the weapon becomes less accurate (larger spread). 1.0 means no change. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lyra|Ability|RangedWeapon|Accuracy", meta=(ClampMin="0.0"))
+	float AccuracySpreadMultiplier = 1.0f;
+
+	/** If true, applies the AccuracySpreadMultiplier (and any BP overrides) on top of the weapon's own spread. When false, behavior matches the original Lyra implementation. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Lyra|Ability|RangedWeapon|Accuracy")
+	bool bUseAccuracySpreadMultiplier = false;
+
+	/** Runtime multiplier applied on top of AccuracySpreadMultiplier. Can be changed from Blueprint at specific moments (roll, jump, damage, slow motion, etc.). */
+	UPROPERTY(BlueprintReadWrite, Category="Lyra|Ability|RangedWeapon|Accuracy")
+	float RuntimeAccuracySpreadMultiplier = 1.0f;
+
+	/** Set the runtime accuracy spread multiplier (0+). 1.0 means no extra change on top of AccuracySpreadMultiplier. */
+	UFUNCTION(BlueprintCallable, Category="Lyra|Ability|RangedWeapon|Accuracy")
+	void SetRuntimeAccuracySpreadMultiplier(float NewMultiplier);
+
+	/** Returns the effective accuracy multiplier that will be applied to spread (1.0 means no change). */
+	UFUNCTION(BlueprintPure, Category="Lyra|Ability|RangedWeapon|Accuracy")
+	float GetEffectiveAccuracyMultiplier() const;
+
+	/** Helper to get the targeting transform using the current avatar pawn as source. */
+	UFUNCTION(BlueprintPure, Category="Lyra|Ability|RangedWeapon|Targeting")
+	FTransform GetAbilityTargetingTransform(ELyraAbilityTargetingSource Source) const;
+
+	/** Helper to get simple aim data from the current avatar pawn. */
+	UFUNCTION(BlueprintPure, Category="Lyra|Ability|RangedWeapon|Targeting")
+	void GetAbilityAimData(ELyraAbilityTargetingSource Source, FVector& OutStartLocation, FVector& OutAimDirection) const;
 
 	//~UGameplayAbility interface
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
@@ -111,11 +139,11 @@ protected:
 
 	void OnTargetDataReadyCallback(const FGameplayAbilityTargetDataHandle& InData, FGameplayTag ApplicationTag);
 
-	UFUNCTION(BlueprintCallable)
+	UFUNCTION(BlueprintCallable, Category="Lyra|Ability|RangedWeapon")
 	void StartRangedWeaponTargeting();
 
 	// Called when target data is ready
-	UFUNCTION(BlueprintImplementableEvent)
+	UFUNCTION(BlueprintImplementableEvent, Category="Lyra|Ability|RangedWeapon")
 	void OnRangedWeaponTargetDataReady(const FGameplayAbilityTargetDataHandle& TargetData);
 
 private:

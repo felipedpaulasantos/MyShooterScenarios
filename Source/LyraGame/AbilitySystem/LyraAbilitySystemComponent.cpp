@@ -26,6 +26,35 @@ ULyraAbilitySystemComponent::ULyraAbilitySystemComponent(const FObjectInitialize
 	FMemory::Memset(ActivationGroupCounts, 0, sizeof(ActivationGroupCounts));
 }
 
+void ULyraAbilitySystemComponent::GetActiveAbilitiesWithClass(TSubclassOf<UGameplayAbility> AbilityClass, TArray<UGameplayAbility*>& ActiveAbilities) const
+{
+	ActiveAbilities.Reset();
+
+	if (*AbilityClass == nullptr)
+	{
+		return;
+	}
+
+	// Iterate over all specs and collect instances that are active and of the requested class (or subclass).
+	for (const FGameplayAbilitySpec& AbilitySpec : ActivatableAbilities.Items)
+	{
+		if (!AbilitySpec.IsActive())
+		{
+			continue;
+		}
+
+		// All Lyra abilities use InstancedPerActor policy, so get all instances.
+		TArray<UGameplayAbility*> Instances = AbilitySpec.GetAbilityInstances();
+		for (UGameplayAbility* Instance : Instances)
+		{
+			if (Instance && Instance->IsA(AbilityClass))
+			{
+				ActiveAbilities.Add(Instance);
+			}
+		}
+	}
+}
+
 void ULyraAbilitySystemComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (ULyraGlobalAbilitySystem* GlobalAbilitySystem = UWorld::GetSubsystem<ULyraGlobalAbilitySystem>(GetWorld()))

@@ -13,7 +13,9 @@
 
 TSoftObjectPtr<UObject> ULyraSystemStatics::GetTypedSoftObjectReferenceFromPrimaryAssetId(FPrimaryAssetId PrimaryAssetId, TSubclassOf<UObject> ExpectedAssetType)
 {
-	if (UAssetManager* Manager = UAssetManager::GetIfValid())
+	// UAssetManager is now always constructed during engine initialization.
+	// Use GetIfInitialized instead of the deprecated GetIfValid.
+	if (UAssetManager* Manager = UAssetManager::GetIfInitialized())
 	{
 		FPrimaryAssetTypeInfo Info;
 		if (Manager->GetPrimaryAssetTypeInfo(PrimaryAssetId.PrimaryAssetType, Info) && !Info.bHasBlueprintClasses)
@@ -109,4 +111,3 @@ TArray<UActorComponent*> ULyraSystemStatics::FindComponentsByClass(AActor* Targe
 	}
 	return MoveTemp(Components);
 }
-
