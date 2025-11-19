@@ -351,6 +351,10 @@
 		{
 			"Name": "XRBase",
 			"Enabled": false
+		},
+		{
+			"Name": "LandscapePatch",
+			"Enabled": true
 		}
 	],
 	"EpicSampleNameHash": "451731683"
