@@ -228,6 +228,7 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 	const APawn* Pawn = GetPawn<APawn>();
 	if (!Pawn)
 	{
+		UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] No Pawn owner"));
 		return;
 	}
 
@@ -236,6 +237,8 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 
 	const ULyraLocalPlayer* LP = Cast<ULyraLocalPlayer>(PC->GetLocalPlayer());
 	check(LP);
+
+	UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] Pawn=%s PC=%s InputComp=%s"), *GetNameSafe(Pawn), *GetNameSafe(PC), *GetNameSafe(PlayerInputComponent));
 
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 	check(Subsystem);
@@ -248,6 +251,7 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 		{
 			if (const ULyraInputConfig* InputConfig = PawnData->InputConfig)
 			{
+				UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] PawnData=%s InputConfig=%s"), *GetNameSafe(PawnData), *GetNameSafe(InputConfig));
 				// UE 5.5: The old PlayerMappableInputConfig system has been removed
 				// Input configs are now loaded through the PawnData's InputConfig directly
 				// The DefaultInputConfigs array is deprecated and should not be used
@@ -273,8 +277,23 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 					LyraIC->BindNativeAction(InputConfig, LyraGameplayTags::InputTag_AutoRun, ETriggerEvent::Triggered, this, &ThisClass::Input_AutoRun, /*bLogIfNotFound=*/ false);
 				}
 			}
+			else
+			{
+				UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] PawnData has NO InputConfig"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] PawnExtComp has NO PawnData"));
 		}
 	}
+	else
+	{
+		UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] No PawnExtensionComponent found for Pawn=%s"), *GetNameSafe(Pawn));
+	}
+
+	// Allow Blueprint subclasses to extend input initialization after the default Lyra bindings are in place.
+	OnInitializePlayerInput(PlayerInputComponent);
 
 	if (ensure(!bReadyToBindInputs))
 	{
@@ -283,6 +302,28 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
  
 	UGameFrameworkComponentManager::SendGameFrameworkComponentExtensionEvent(const_cast<APlayerController*>(PC), NAME_BindInputsNow);
 	UGameFrameworkComponentManager::SendGameFrameworkComponentExtensionEvent(const_cast<APawn*>(Pawn), NAME_BindInputsNow);
+}
+
+void ULyraHeroComponent::ReinitializePlayerInput()
+{
+	APawn* Pawn = GetPawn<APawn>();
+	if (!Pawn)
+	{
+		UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::ReinitializePlayerInput] No Pawn owner"));
+		return;
+	}
+
+	UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::ReinitializePlayerInput] Pawn=%s InputComponent=%s"), *GetNameSafe(Pawn), *GetNameSafe(Pawn->InputComponent));
+
+	if (UInputComponent* PlayerInputComponent = Pawn->InputComponent)
+	{
+		InitializePlayerInput(PlayerInputComponent);
+	}
+}
+
+void ULyraHeroComponent::OnInitializePlayerInput_Implementation(UInputComponent* PlayerInputComponent)
+{
+	// Default implementation does nothing; override in C++ subclasses or Blueprints to extend input bindings.
 }
 
 void ULyraHeroComponent::AddAdditionalInputConfig(const ULyraInputConfig* InputConfig)

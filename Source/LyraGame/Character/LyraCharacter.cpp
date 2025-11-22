@@ -6,6 +6,7 @@
 #include "Camera/LyraCameraComponent.h"
 #include "Character/LyraHealthComponent.h"
 #include "Character/LyraPawnExtensionComponent.h"
+#include "Character/LyraHeroComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "LyraCharacterMovementComponent.h"
@@ -219,6 +220,32 @@ void ALyraCharacter::PossessedBy(AController* NewController)
 		ControllerAsTeamProvider->GetTeamChangedDelegateChecked().AddDynamic(this, &ThisClass::OnControllerChangedTeam);
 	}
 	ConditionalBroadcastTeamChanged(this, OldTeamID, MyTeamID);
+
+	// Optional: support reusing an already-spawned LyraCharacter after it has been unpossessed/uninitialized.
+	// When bAllowRepossess is true, we reinitialize ability system and later input on new possession instead of relying
+	// on the standard spawn/init pipeline only.
+	if (bAllowRepossess)
+	{
+		UE_LOG(LogLyra, Warning, TEXT("[LyraCharacter::PossessedBy] Repossess path: Pawn=%s Controller=%s"), *GetNameSafe(this), *GetNameSafe(NewController));
+		// Make sure the actor is visible again in case UninitAndDestroy hid it.
+		SetActorHiddenInGame(false);
+
+		// Server: re-initialize the ability system if this pawn should be the current avatar again.
+		if (HasAuthority())
+		{
+			if (ALyraPlayerState* LyraPS = GetLyraPlayerState())
+			{
+				if (ULyraAbilitySystemComponent* LyraASC = LyraPS->GetLyraAbilitySystemComponent())
+				{
+					if (ULyraPawnExtensionComponent* PawnExtCompLocal = ULyraPawnExtensionComponent::FindPawnExtensionComponent(this))
+					{
+						UE_LOG(LogLyra, Warning, TEXT("[LyraCharacter::PossessedBy] Reinitializing ASC for Pawn=%s PS=%s"), *GetNameSafe(this), *GetNameSafe(LyraPS));
+						PawnExtCompLocal->InitializeAbilitySystem(LyraASC, LyraPS);
+					}
+				}
+			}
+		}
+	}
 }
 
 void ALyraCharacter::UnPossessed()
@@ -260,6 +287,16 @@ void ALyraCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	PawnExtComponent->SetupPlayerInputComponent();
+
+	// If this character supports repossess, ensure hero input gets rebound once an input component exists.
+	if (bAllowRepossess && IsLocallyControlled())
+	{
+		if (ULyraHeroComponent* HeroComp = ULyraHeroComponent::FindHeroComponent(this))
+		{
+			UE_LOG(LogLyra, Warning, TEXT("[LyraCharacter::SetupPlayerInputComponent] Rebinding input via Hero for Pawn=%s InputComp=%s"), *GetNameSafe(this), *GetNameSafe(PlayerInputComponent));
+			HeroComp->ReinitializePlayerInput();
+		}
+	}
 }
 
 void ALyraCharacter::InitializeGameplayTags()

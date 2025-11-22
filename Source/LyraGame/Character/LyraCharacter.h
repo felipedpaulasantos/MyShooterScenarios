@@ -8,6 +8,8 @@
 #include "ModularCharacter.h"
 #include "Teams/LyraTeamAgentInterface.h"
 
+class ULyraHeroComponent;
+
 #include "LyraCharacter.generated.h"
 
 class AActor;
@@ -100,6 +102,10 @@ class LYRAGAME_API ALyraCharacter : public AModularCharacter, public IAbilitySys
 public:
 
 	ALyraCharacter(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	/** If true, this character supports being possessed again after having been unpossessed/uninitialized, reusing the same actor and reinitializing input/abilities. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Character")
+	bool bAllowRepossess = false;
 
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Character")
 	ALyraPlayerController* GetLyraPlayerController() const;

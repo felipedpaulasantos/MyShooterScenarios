@@ -88,6 +88,10 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Hero|Input", meta=(BlueprintProtected="true"))
 	virtual void InitializePlayerInput(UInputComponent* PlayerInputComponent);
 
+	/** Blueprint hook called after the default player input bindings for this hero have been initialized. */
+	UFUNCTION(BlueprintNativeEvent, Category = "Lyra|Hero|Input", meta=(BlueprintProtected="true"))
+	void OnInitializePlayerInput(UInputComponent* PlayerInputComponent);
+
 	/** Input: ability tag pressed */
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Hero|Input", meta=(BlueprintProtected="true"))
 	void Input_AbilityInputTagPressed(FGameplayTag InputTag);
@@ -114,6 +118,10 @@ public:
 	// Optional acceleration for right-stick camera look. Disabled by default to preserve behavior.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(DisplayName="Enable Right Stick Look Acceleration"))
 	bool bLookStickAccelerationEnabled = false;
+
+	/** Reinitialize input bindings for this hero using the current pawn InputComponent, if available. */
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Hero|Input")
+	void ReinitializePlayerInput();
 
 	// Time (in seconds) to reach full look speed after the stick is engaged beyond the reset threshold.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(ClampMin="0.0"))
