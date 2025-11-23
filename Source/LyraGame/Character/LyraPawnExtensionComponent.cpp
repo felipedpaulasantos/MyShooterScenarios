@@ -3,6 +3,7 @@
 #include "LyraPawnExtensionComponent.h"
 
 #include "AbilitySystem/LyraAbilitySystemComponent.h"
+#include "AbilitySystem/LyraAbilitySet.h"
 #include "Components/GameFrameworkComponentDelegates.h"
 #include "Components/GameFrameworkComponentManager.h"
 #include "GameFramework/Controller.h"
@@ -144,6 +145,10 @@ void ULyraPawnExtensionComponent::InitializeAbilitySystem(ULyraAbilitySystemComp
 	if (ensure(PawnData))
 	{
 		InASC->SetTagRelationshipMapping(PawnData->TagRelationshipMapping);
+
+		// (Re)apply any ability sets defined on the PawnData using granted handles, so we can
+		// cleanly remove and regrant them when the pawn/ASC relationship changes (e.g., repossess).
+		ApplyPawnDataAbilitySets();
 	}
 
 	OnAbilitySystemInitialized.Broadcast();
@@ -165,6 +170,13 @@ void ULyraPawnExtensionComponent::UninitializeAbilitySystem()
 		AbilitySystemComponent->CancelAbilities(nullptr, &AbilityTypesToIgnore);
 		AbilitySystemComponent->ClearAbilityInput();
 		AbilitySystemComponent->RemoveAllGameplayCues();
+
+		// Remove anything previously granted from PawnData ability sets.
+		for (FLyraAbilitySet_GrantedHandles& Handles : PawnAbilitySetHandles)
+		{
+			Handles.TakeFromAbilitySystem(AbilitySystemComponent);
+		}
+		PawnAbilitySetHandles.Reset();
 
 		if (AbilitySystemComponent->GetOwnerActor() != nullptr)
 		{
@@ -310,3 +322,57 @@ void ULyraPawnExtensionComponent::OnAbilitySystemUninitialized_Register(FSimpleM
 	}
 }
 
+void ULyraPawnExtensionComponent::ApplyPawnDataAbilitySets()
+{
+	if (!AbilitySystemComponent || !PawnData)
+	{
+		return;
+	}
+
+	// First remove any previously granted ability sets from this PawnData (if any), then regrant fresh.
+	for (FLyraAbilitySet_GrantedHandles& Handles : PawnAbilitySetHandles)
+	{
+		Handles.TakeFromAbilitySystem(AbilitySystemComponent);
+	}
+	PawnAbilitySetHandles.Reset();
+
+	for (const ULyraAbilitySet* AbilitySet : PawnData->AbilitySets)
+	{
+		if (AbilitySet)
+		{
+			FLyraAbilitySet_GrantedHandles& NewHandles = PawnAbilitySetHandles.AddDefaulted_GetRef();
+			AbilitySet->GiveToAbilitySystem(AbilitySystemComponent, &NewHandles, GetOwner());
+		}
+	}
+}
+
+void ULyraPawnExtensionComponent::RefreshAbilitySystemAvatar()
+{
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	APawn* Pawn = GetPawn<APawn>();
+	if (!Pawn)
+	{
+		return;
+	}
+
+	// Only refresh if the ASC thinks it has no avatar or a different one.
+	AActor* CurrentAvatar = AbilitySystemComponent->GetAvatarActor();
+	if (CurrentAvatar == Pawn)
+	{
+		// Already correct.
+		return;
+	}
+
+	UE_LOG(LogLyra, Warning, TEXT("[PawnExtension::RefreshAbilitySystemAvatar] Forcing ASC ActorInfo reset. ASC=%s OldAvatar=%s NewAvatar=%s"),
+		*GetNameSafe(AbilitySystemComponent), *GetNameSafe(CurrentAvatar), *GetNameSafe(Pawn));
+
+	// Re-init the ability actor info pairing owner + pawn.
+	AbilitySystemComponent->InitAbilityActorInfo(AbilitySystemComponent->GetOwnerActor(), Pawn);
+
+	// Reapply PawnData ability sets to ensure any passive tags/effects return.
+	ApplyPawnDataAbilitySets();
+}

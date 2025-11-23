@@ -77,12 +77,14 @@ void ULyraAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 
 	if (bHasNewPawnAvatar)
 	{
+		// When we are switching to a new pawn avatar (including repossess flows),
+		// clear any cached input state so we don't keep handles from a previous avatar.
+		ClearAbilityInput();
+
 		// Notify all abilities that a new pawn avatar has been set
 		for (const FGameplayAbilitySpec& AbilitySpec : ActivatableAbilities.Items)
 		{
-			ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(AbilitySpec.Ability);
-
-			// All Lyra abilities use InstancedPerActor policy
+			// Removed unused LyraAbilityCDO variable (was only enforcing cast).
 			TArray<UGameplayAbility*> Instances = AbilitySpec.GetAbilityInstances();
 			for (UGameplayAbility* AbilityInstance : Instances)
 			{
@@ -243,8 +245,6 @@ void ULyraAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGam
 	static TArray<FGameplayAbilitySpecHandle> AbilitiesToActivate;
 	AbilitiesToActivate.Reset();
 
-	//@TODO: See if we can use FScopedServerAbilityRPCBatcher ScopedRPCBatcher in some of these loops
-
 	//
 	// Process all abilities that activate when the input is held.
 	//
@@ -255,7 +255,6 @@ void ULyraAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGam
 			if (AbilitySpec->Ability && !AbilitySpec->IsActive())
 			{
 				const ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(AbilitySpec->Ability);
-
 				if (LyraAbilityCDO->GetActivationPolicy() == ELyraAbilityActivationPolicy::WhileInputActive)
 				{
 					AbilitiesToActivate.AddUnique(AbilitySpec->Handle);
@@ -274,16 +273,13 @@ void ULyraAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGam
 			if (AbilitySpec->Ability)
 			{
 				AbilitySpec->InputPressed = true;
-
 				if (AbilitySpec->IsActive())
 				{
-					// Ability is active so pass along the input event.
 					AbilitySpecInputPressed(*AbilitySpec);
 				}
 				else
 				{
 					const ULyraGameplayAbility* LyraAbilityCDO = CastChecked<ULyraGameplayAbility>(AbilitySpec->Ability);
-
 					if (LyraAbilityCDO->GetActivationPolicy() == ELyraAbilityActivationPolicy::OnInputTriggered)
 					{
 						AbilitiesToActivate.AddUnique(AbilitySpec->Handle);
@@ -293,14 +289,27 @@ void ULyraAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGam
 		}
 	}
 
-	//
-	// Try to activate all the abilities that are from presses and holds.
-	// We do it all at once so that held inputs don't activate the ability
-	// and then also send a input event to the ability because of the press.
-	//
+	// Try to activate all queued abilities (presses + holds)
 	for (const FGameplayAbilitySpecHandle& AbilitySpecHandle : AbilitiesToActivate)
 	{
-		TryActivateAbility(AbilitySpecHandle);
+		const FGameplayAbilitySpec* SpecBefore = FindAbilitySpecFromHandle(AbilitySpecHandle);
+		FString AbilityName = SpecBefore && SpecBefore->Ability ? SpecBefore->Ability->GetName() : TEXT("<Invalid>");
+		ELyraAbilityActivationPolicy Policy = SpecBefore && SpecBefore->Ability ? CastChecked<ULyraGameplayAbility>(SpecBefore->Ability)->GetActivationPolicy() : ELyraAbilityActivationPolicy::OnInputTriggered;
+
+		bool bActivated = TryActivateAbility(AbilitySpecHandle);
+
+		const FGameplayAbilitySpec* SpecAfter = FindAbilitySpecFromHandle(AbilitySpecHandle);
+		bool bIsActiveNow = SpecAfter ? SpecAfter->IsActive() : false;
+		
+
+		if (!bActivated && !bIsActiveNow && SpecAfter && SpecAfter->Ability)
+		{
+			FGameplayTagContainer FailureTags;
+			bool bCanActivate = SpecAfter->Ability->CanActivateAbility(AbilitySpecHandle, AbilityActorInfo.Get(), nullptr, nullptr, &FailureTags);
+			UE_LOG(LogLyra, Verbose,
+				TEXT("[LyraASC::ProcessAbilityInput] Activation failed Ability=%s CanActivateNow=%d FailureTags=%s"),
+				*AbilityName, bCanActivate ? 1 : 0, *FailureTags.ToString());
+		}
 	}
 
 	//
@@ -313,19 +322,17 @@ void ULyraAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGam
 			if (AbilitySpec->Ability)
 			{
 				AbilitySpec->InputPressed = false;
-
 				if (AbilitySpec->IsActive())
 				{
-					// Ability is active so pass along the input event.
- 					AbilitySpecInputReleased(*AbilitySpec);
+					AbilitySpecInputReleased(*AbilitySpec);
+					UE_LOG(LogLyra, Verbose,
+						TEXT("[LyraASC::ProcessAbilityInput] InputReleased forwarded Ability=%s"),
+						*GetNameSafe(AbilitySpec->Ability));
 				}
 			}
 		}
 	}
 
-	//
-	// Clear the cached ability handles.
-	//
 	InputPressedSpecHandles.Reset();
 	InputReleasedSpecHandles.Reset();
 }
@@ -355,9 +362,16 @@ void ULyraAbilitySystemComponent::NotifyAbilityFailed(const FGameplayAbilitySpec
 		if (!Avatar->IsLocallyControlled() && Ability->IsSupportedForNetworking())
 		{
 			ClientNotifyAbilityFailed(Ability, FailureReason);
+			UE_LOG(LogLyra, Verbose,
+				TEXT("[LyraASC::NotifyAbilityFailed] Remote AbilityFailed Ability=%s Tags=%s"),
+				*GetNameSafe(Ability), *FailureReason.ToString());
 			return;
 		}
 	}
+
+	UE_LOG(LogLyra, Verbose,
+		TEXT("[LyraASC::NotifyAbilityFailed] Local AbilityFailed Ability=%s Tags=%s"),
+		*GetNameSafe(Ability), *FailureReason.ToString());
 
 	HandleAbilityFailed(Ability, FailureReason);
 }

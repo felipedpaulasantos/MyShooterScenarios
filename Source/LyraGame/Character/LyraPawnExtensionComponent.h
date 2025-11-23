@@ -4,6 +4,7 @@
 
 #include "Components/GameFrameworkInitStateInterface.h"
 #include "Components/PawnComponent.h"
+#include "AbilitySystem/LyraAbilitySet.h"
 
 #include "LyraPawnExtensionComponent.generated.h"
 
@@ -12,6 +13,7 @@ namespace EEndPlayReason { enum Type : int; }
 class UGameFrameworkComponentManager;
 class ULyraAbilitySystemComponent;
 class ULyraPawnData;
+class ULyraAbilitySet;
 class UObject;
 struct FActorInitStateChangedParams;
 struct FFrame;
@@ -62,6 +64,9 @@ public:
 	/** Should be called by the owning pawn to remove itself as the avatar of the ability system. */
 	void UninitializeAbilitySystem();
 
+	/** Reapply PawnData AbilitySets to the current ASC (used when reusing a pawn after repossess). */
+	void ApplyPawnDataAbilitySets();
+
 	/** Should be called by the owning pawn when the pawn's controller changes. */
 	void HandleControllerChanged();
 
@@ -77,8 +82,10 @@ public:
 	/** Register with the OnAbilitySystemUninitialized delegate fired when our pawn is removed as the ability system's avatar actor */
 	void OnAbilitySystemUninitialized_Register(FSimpleMulticastDelegate::FDelegate Delegate);
 
-protected:
+	/** Force refreshing the ASC's ActorInfo avatar to this pawn (used for client-side repossess when ASC pointer hasn't changed). */
+	void RefreshAbilitySystemAvatar();
 
+protected:
 	virtual void OnRegister() override;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -99,4 +106,8 @@ protected:
 	/** Pointer to the ability system component that is cached for convenience. */
 	UPROPERTY()
 	TObjectPtr<ULyraAbilitySystemComponent> AbilitySystemComponent;
+
+	/** Handles for anything granted by PawnData AbilitySets so we can remove/reapply cleanly. */
+	UPROPERTY()
+	TArray<FLyraAbilitySet_GrantedHandles> PawnAbilitySetHandles;
 };

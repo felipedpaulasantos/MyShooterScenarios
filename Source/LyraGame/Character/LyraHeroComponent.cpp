@@ -237,9 +237,7 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 
 	const ULyraLocalPlayer* LP = Cast<ULyraLocalPlayer>(PC->GetLocalPlayer());
 	check(LP);
-
-	UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] Pawn=%s PC=%s InputComp=%s"), *GetNameSafe(Pawn), *GetNameSafe(PC), *GetNameSafe(PlayerInputComponent));
-
+	
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 	check(Subsystem);
 
@@ -251,7 +249,6 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 		{
 			if (const ULyraInputConfig* InputConfig = PawnData->InputConfig)
 			{
-				UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::InitializePlayerInput] PawnData=%s InputConfig=%s"), *GetNameSafe(PawnData), *GetNameSafe(InputConfig));
 				// UE 5.5: The old PlayerMappableInputConfig system has been removed
 				// Input configs are now loaded through the PawnData's InputConfig directly
 				// The DefaultInputConfigs array is deprecated and should not be used
@@ -262,6 +259,11 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 				ULyraInputComponent* LyraIC = Cast<ULyraInputComponent>(PlayerInputComponent);
 				if (ensureMsgf(LyraIC, TEXT("Unexpected Input Component class! The Gameplay Abilities will not be bound to their inputs. Change the input component to ULyraInputComponent or a subclass of it.")))
 				{
+					// Clear any previous bindings/mappings from this input component so we don't end up
+					// with duplicated ability bindings or stale mappings on repossess/reuse flows.
+					LyraIC->ClearActionBindings();
+					LyraIC->AxisBindings.Reset();
+
 					// Add the key mappings that may have been set by the player
 					LyraIC->AddInputMappings(InputConfig, Subsystem);
 
@@ -295,10 +297,9 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 	// Allow Blueprint subclasses to extend input initialization after the default Lyra bindings are in place.
 	OnInitializePlayerInput(PlayerInputComponent);
 
-	if (ensure(!bReadyToBindInputs))
-	{
-		bReadyToBindInputs = true;
-	}
+	// Mark that inputs have been bound; in reuse/repossess flows this may be called more than once,
+	// so avoid asserting on repeated initialization.
+	bReadyToBindInputs = true;
  
 	UGameFrameworkComponentManager::SendGameFrameworkComponentExtensionEvent(const_cast<APlayerController*>(PC), NAME_BindInputsNow);
 	UGameFrameworkComponentManager::SendGameFrameworkComponentExtensionEvent(const_cast<APawn*>(Pawn), NAME_BindInputsNow);
@@ -312,9 +313,7 @@ void ULyraHeroComponent::ReinitializePlayerInput()
 		UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::ReinitializePlayerInput] No Pawn owner"));
 		return;
 	}
-
-	UE_LOG(LogLyra, Warning, TEXT("[LyraHeroComponent::ReinitializePlayerInput] Pawn=%s InputComponent=%s"), *GetNameSafe(Pawn), *GetNameSafe(Pawn->InputComponent));
-
+	
 	if (UInputComponent* PlayerInputComponent = Pawn->InputComponent)
 	{
 		InitializePlayerInput(PlayerInputComponent);
@@ -373,9 +372,30 @@ void ULyraHeroComponent::Input_AbilityInputTagPressed(FGameplayTag InputTag)
 		{
 			if (ULyraAbilitySystemComponent* LyraASC = PawnExtComp->GetLyraAbilitySystemComponent())
 			{
+				// For debugging: count abilities that are bound to this input tag.
+				const TArray<FGameplayAbilitySpec>& Specs = LyraASC->GetActivatableAbilities();
+				int32 MatchingCount = 0;
+				for (const FGameplayAbilitySpec& Spec : Specs)
+				{
+					if (Spec.Ability)
+					{
+						const FGameplayTagContainer& AbilityTags = Spec.GetDynamicSpecSourceTags();
+						if (AbilityTags.HasTagExact(InputTag))
+						{
+							++MatchingCount;
+						}
+					}
+				}
+				
 				LyraASC->AbilityInputTagPressed(InputTag);
 			}
-		}	
+			else
+			{
+				UE_LOG(LogLyra, Warning,
+					TEXT("[LyraHeroComponent::Input_AbilityInputTagPressed] No ASC found for Pawn=%s"),
+					*GetNameSafe(Pawn));
+			}
+		}
 	}
 }
 

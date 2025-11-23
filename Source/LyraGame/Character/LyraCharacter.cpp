@@ -18,6 +18,9 @@
 #include "System/LyraSignificanceManager.h"
 #include "TimerManager.h"
 
+#include "Character/LyraPawnData.h"
+#include "AbilitySystem/LyraAbilitySet.h"
+
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraCharacter)
 
 class AActor;
@@ -195,6 +198,9 @@ void ALyraCharacter::OnAbilitySystemInitialized()
 	ULyraAbilitySystemComponent* LyraASC = GetLyraAbilitySystemComponent();
 	check(LyraASC);
 
+	const TArray<FGameplayAbilitySpec>& Specs = LyraASC->GetActivatableAbilities();
+	const int32 NumSpecs = Specs.Num();
+
 	HealthComponent->InitializeWithAbilitySystem(LyraASC);
 
 	InitializeGameplayTags();
@@ -213,7 +219,7 @@ void ALyraCharacter::PossessedBy(AController* NewController)
 
 	PawnExtComponent->HandleControllerChanged();
 
-	// Grab the current team ID and listen for future changes
+	// Update our team ID based on the controller
 	if (ILyraTeamAgentInterface* ControllerAsTeamProvider = Cast<ILyraTeamAgentInterface>(NewController))
 	{
 		MyTeamID = ControllerAsTeamProvider->GetGenericTeamId();
@@ -226,21 +232,52 @@ void ALyraCharacter::PossessedBy(AController* NewController)
 	// on the standard spawn/init pipeline only.
 	if (bAllowRepossess)
 	{
-		UE_LOG(LogLyra, Warning, TEXT("[LyraCharacter::PossessedBy] Repossess path: Pawn=%s Controller=%s"), *GetNameSafe(this), *GetNameSafe(NewController));
-		// Make sure the actor is visible again in case UninitAndDestroy hid it.
 		SetActorHiddenInGame(false);
 
-		// Server: re-initialize the ability system if this pawn should be the current avatar again.
 		if (HasAuthority())
 		{
-			if (ALyraPlayerState* LyraPS = GetLyraPlayerState())
+			// Make sure the actor is visible again in case UninitAndDestroy hid it.
+			SetActorHiddenInGame(false);
+
+			// Server: re-initialize the ability system if this pawn should be the current avatar again.
+			if (HasAuthority())
 			{
-				if (ULyraAbilitySystemComponent* LyraASC = LyraPS->GetLyraAbilitySystemComponent())
+				if (ALyraPlayerState* LyraPS = GetLyraPlayerState())
 				{
-					if (ULyraPawnExtensionComponent* PawnExtCompLocal = ULyraPawnExtensionComponent::FindPawnExtensionComponent(this))
+					if (ULyraAbilitySystemComponent* LyraASC = LyraPS->GetLyraAbilitySystemComponent())
 					{
-						UE_LOG(LogLyra, Warning, TEXT("[LyraCharacter::PossessedBy] Reinitializing ASC for Pawn=%s PS=%s"), *GetNameSafe(this), *GetNameSafe(LyraPS));
-						PawnExtCompLocal->InitializeAbilitySystem(LyraASC, LyraPS);
+						if (ULyraPawnExtensionComponent* PawnExtCompLocal = ULyraPawnExtensionComponent::FindPawnExtensionComponent(this))
+						{
+							PawnExtCompLocal->InitializeAbilitySystem(LyraASC, LyraPS);
+
+							// Clear any lingering input state or input-blocking tags from previous avatars so
+							// that ability-input-driven abilities work correctly after a repossess.
+							LyraASC->ClearAbilityInput();
+							if (LyraASC->HasMatchingGameplayTag(TAG_Gameplay_AbilityInputBlocked))
+							{
+								LyraASC->RemoveDynamicTagGameplayEffect(TAG_Gameplay_AbilityInputBlocked);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (IsLocallyControlled())
+		{
+			if (ULyraHeroComponent* HeroComp = ULyraHeroComponent::FindHeroComponent(this))
+			{
+				HeroComp->ReinitializePlayerInput();
+			}
+
+			// Ensure client ASC avatar pairing restored if lost.
+			if (ULyraPawnExtensionComponent* PawnExt = ULyraPawnExtensionComponent::FindPawnExtensionComponent(this))
+			{
+				if (ULyraAbilitySystemComponent* LyraASC = PawnExt->GetLyraAbilitySystemComponent())
+				{
+					if (LyraASC->GetAvatarActor() != this)
+					{
+						PawnExt->RefreshAbilitySystemAvatar();
 					}
 				}
 			}
@@ -293,7 +330,6 @@ void ALyraCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	{
 		if (ULyraHeroComponent* HeroComp = ULyraHeroComponent::FindHeroComponent(this))
 		{
-			UE_LOG(LogLyra, Warning, TEXT("[LyraCharacter::SetupPlayerInputComponent] Rebinding input via Hero for Pawn=%s InputComp=%s"), *GetNameSafe(this), *GetNameSafe(PlayerInputComponent));
 			HeroComp->ReinitializePlayerInput();
 		}
 	}
