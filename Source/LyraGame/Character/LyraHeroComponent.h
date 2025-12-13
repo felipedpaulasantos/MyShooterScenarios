@@ -115,47 +115,13 @@ protected:
 	TSubclassOf<ULyraCameraMode> DetermineCameraMode() const;
 
 public:
-	// Optional acceleration for right-stick camera look. Disabled by default to preserve behavior.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(DisplayName="Enable Right Stick Look Acceleration"))
-	bool bLookStickAccelerationEnabled = false;
+	// Optional acceleration curve for right-stick camera look. If null, stick input is passed through unmodified.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(DisplayName="Gamepad Look Stick Acceleration Curve"))
+	class UCurveFloat* LookStickAccelerationCurve = nullptr;
 
 	/** Reinitialize input bindings for this hero using the current pawn InputComponent, if available. */
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Hero|Input")
 	void ReinitializePlayerInput();
-
-	// Time (in seconds) to reach full look speed after the stick is engaged beyond the reset threshold.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(ClampMin="0.0"))
-	float LookStickAccelTimeToMax = 0.25f;
-
-	// Starting speed multiplier when the stick is first engaged. 0.0..1.0 (1.0 = immediate full speed).
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(ClampMin="0.0", ClampMax="1.0"))
-	float LookStickAccelStartScale = 0.35f;
-
-	// Stick magnitude at which the acceleration resets (0..1). Helps avoid small jitter.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(ClampMin="0.0", ClampMax="1.0"))
-	float LookStickResetThreshold = 0.10f;
-
-	UFUNCTION(BlueprintCallable, Category = "Lyra|Hero|Camera")
-	void SetLookStickAccelerationEnabled(bool bEnabled) { bLookStickAccelerationEnabled = bEnabled; }
-
-	UFUNCTION(BlueprintPure, Category = "Lyra|Hero|Camera")
-	bool GetLookStickAccelerationEnabled() const { return bLookStickAccelerationEnabled; }
-
-	UFUNCTION(BlueprintCallable, Category = "Lyra|Hero|Camera")
-	void ConfigureLookStickAcceleration(float TimeToMax, float StartScale, float ResetThreshold)
-	{
-		LookStickAccelTimeToMax = FMath::Max(0.f, TimeToMax);
-		LookStickAccelStartScale = FMath::Clamp(StartScale, 0.f, 1.f);
-		LookStickResetThreshold = FMath::Clamp(ResetThreshold, 0.f, 1.f);
-	}
-
-	UFUNCTION(BlueprintPure, Category = "Lyra|Hero|Camera")
-	void GetLookStickAcceleration(float& TimeToMax, float& StartScale, float& ResetThreshold) const
-	{
-		TimeToMax = LookStickAccelTimeToMax;
-		StartScale = LookStickAccelStartScale;
-		ResetThreshold = LookStickResetThreshold;
-	}
 
 protected:
 	// DEPRECATED: DefaultInputConfigs removed for UE 5.5
@@ -175,9 +141,33 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Lyra|Hero")
 	bool bReadyToBindInputs;
 
-	// Internal state for look acceleration (not editable at design time).
+	/** Força do filtro temporal exponencial aplicado à entrada do stick direito.
+	 * 0.0 = desativado (comportamento original, sem atraso adicional).
+	 * 1.0 = suavização forte (mais estável, porém mais lenta para grandes correções).
+	 */
+	UPROPERTY(EditAnywhere, Category = "Hero|Input|Look|Stick", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float LookStickSmoothingStrength = 0.0f;
+
+	/**
+	 * Limite opcional de variação máxima por segundo (em graus/segundo) do valor suavizado.
+	 * 0.0 = sem limite extra (usa apenas o filtro exponencial).
+	 * Use valores como 720-1080 para limitar a "cauda" da suavização sem afetar giros rápidos.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Hero|Input|Look|Stick", meta = (ClampMin = "0.0"))
+	float LookStickSmoothingMaxLagDegreesPerSec = 0.0f;
+
+	/** Valor suavizado temporalmente do stick direito (em unidades normalizadas de stick). */
 	UPROPERTY(Transient)
-	float LookStickAccelAlpha = 0.0f;
+	FVector2D LookStickSmoothedValue = FVector2D::ZeroVector;
+
+	// Time-based state for right-stick look acceleration (gamepad only).
 	UPROPERTY(Transient)
-	float LookStickPrevMagnitude = 0.0f;
+	float LookStickTimeSinceEngaged = 0.0f;
+
+	UPROPERTY(Transient)
+	FVector2D LookStickPrevDirection = FVector2D::ZeroVector;
+
+	// Cached multiplier used for smooth ramp-down when the stick is released.
+	UPROPERTY(Transient)
+	float LookStickCurrentMultiplier = 0.0f;
 };
