@@ -148,7 +148,7 @@ float FAimAssistSettings::GetTargetWeightForTime(float Time) const
 	// TargetWeightCurve is optional - if not set, we return 0.0f which disables weight-based aim assist
 	if (TargetWeightCurve == nullptr)
 	{
-		return 0.0f;
+		return 1.0f;
 	}
 
 	return FMath::Clamp(TargetWeightCurve->GetFloatValue(Time), 0.0f, 1.0f);
@@ -159,7 +159,7 @@ float FAimAssistSettings::GetTargetWeightMaxTime() const
 	// TargetWeightCurve is optional - if not set, we return 0.0f
 	if (TargetWeightCurve == nullptr)
 	{
-		return 0.0f;
+		return 1.0f;
 	}
 
 	float MinTime = 0.0f;
@@ -564,7 +564,7 @@ void UAimAssistInputModifier::UpdateTargetData(float DeltaTime)
 	// Update target weights.
 	//
 	float TotalAssistWeight = 0.0f;
-
+	
 	for (FLyraAimAssistTarget& Target : NewTargetCache)
 	{
 		if (Target.bUnderAssistOuterReticle && Target.bIsVisible)

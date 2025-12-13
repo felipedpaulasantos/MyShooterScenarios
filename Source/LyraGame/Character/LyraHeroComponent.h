@@ -118,16 +118,7 @@ public:
 	// Optional acceleration curve for right-stick camera look. If null, stick input is passed through unmodified.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(DisplayName="Gamepad Look Stick Acceleration Curve"))
 	class UCurveFloat* LookStickAccelerationCurve = nullptr;
-
-	/** Strength of the temporal smoothing filter applied to the right stick look input (gamepad only).
-	 * 0.0 = disabled (original behaviour, no additional temporal smoothing).
-	 * 1.0 = strong smoothing (more stable but slower to respond to big changes).
-	 *
-	 * This is evaluated in C++ when handling `IA_Look_Stick` and can be tweaked in blueprints per-hero.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera")
-	float LookStickSmoothingStrength = 0.0f;
-
+	
 	/** Optional maximum rate, in normalized stick units per second, at which the smoothed
 	 * look value is allowed to change. 0.0 means "no explicit clamp", only the
 	 * exponential smoothing defined by LookStickSmoothingStrength is used.
