@@ -504,6 +504,8 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 	// Time state for optional acceleration curve
 	if (bStickIsCurrentlyActive)
 	{
+		// Avança o tempo base em função de DeltaTime, mas a velocidade de avanço
+		// efetiva na curva será modulada pela magnitude do stick mais abaixo.
 		LookStickTimeSinceEngaged += DeltaTime;
 	}
 	else
@@ -518,13 +520,34 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 		Target = FVector2D::ZeroVector;
 	}
 
-	// Optional acceleration curve
+	float NormalizedMag = 0.0f;
+	float CurveValue = 1.0f;
+
+	// Optional acceleration curve with magnitude-based ramp speed modulation
 	if (LookStickAccelerationCurve && bStickIsCurrentlyActive)
 	{
-		float TimeMultiplier = LookStickAccelerationCurve->GetFloatValue(LookStickTimeSinceEngaged);
-		TimeMultiplier = FMath::Clamp(TimeMultiplier, 0.0f, 1.5f);
+		// Normaliza a magnitude (0..1) ignorando o trechinho da deadzone.
+		// Assim, logo após sair da deadzone a influência é baixa e aumenta
+		// progressivamente até 1.0 com o stick totalmente empurrado.
+		NormalizedMag = FMath::Clamp((Mag - DeadZone) / (1.0f - DeadZone), 0.0f, 1.0f);
+
+		// A magnitude do stick controla a VELOCIDADE com que avançamos na curva:
+		// - NormalizedMag pequeno  -> tempo efetivo cresce devagar (rampa lenta)
+		// - NormalizedMag grande   -> tempo efetivo cresce rápido (rampa rápida)
+		const float EffectiveTime = LookStickTimeSinceEngaged * FMath::Max(NormalizedMag, KINDA_SMALL_NUMBER);
+
+		CurveValue = LookStickAccelerationCurve->GetFloatValue(EffectiveTime);
+		float TimeMultiplier = FMath::Clamp(CurveValue, 0.0f, 1.5f);
+
+		// Aplica o multiplicador de tempo ao valor alvo do stick.
 		Target *= TimeMultiplier;
 	}
+	
+	// Magnitude final aplicada ao look depois do ramp
+	const float FinalMag = Target.Size();
+
+	// Log de debug para inspecionar o comportamento do look stick
+	UE_LOG(LogLyra, Warning, TEXT("LookStick: RawMag=%.3f NormalizedMag=%.3f CurveValue=%.3f FinalMag=%.3f"), Mag, NormalizedMag, CurveValue, FinalMag);
 	
 	LookStickSmoothedValue = Target;
 
