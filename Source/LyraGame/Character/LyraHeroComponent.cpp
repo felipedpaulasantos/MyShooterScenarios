@@ -23,10 +23,6 @@
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraHeroComponent)
 
-#if WITH_EDITOR
-#include "Misc/UObjectToken.h"
-#endif	// WITH_EDITOR
-
 namespace LyraHero
 {
 	static const float LookYawRate = 300.0f;
@@ -43,6 +39,9 @@ ULyraHeroComponent::ULyraHeroComponent(const FObjectInitializer& ObjectInitializ
 	bReadyToBindInputs = false;
 
 	// Initialize look stick temporal smoothing state.
+	LookStickTimeSinceEngaged = 0.0f;
+	LookStickPrevDirection = FVector2D::ZeroVector;
+	LookStickCurrentMultiplier = 0.0f;
 	LookStickSmoothedValue = FVector2D::ZeroVector;
 }
 
@@ -220,6 +219,12 @@ void ULyraHeroComponent::BeginPlay()
 void ULyraHeroComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnregisterInitStateFeature();
+
+	// Reset look stick smoothing state
+	LookStickTimeSinceEngaged = 0.0f;
+	LookStickPrevDirection = FVector2D::ZeroVector;
+	LookStickCurrentMultiplier = 0.0f;
+	LookStickSmoothedValue = FVector2D::ZeroVector;
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -479,137 +484,146 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 	{
 		return;
 	}
-	
-	FVector2D RawValue = InputActionValue.Get<FVector2D>();
 
-	const UWorld* World = GetWorld();
-	check(World);
+	const FVector2D RawValue = InputActionValue.Get<FVector2D>();
+	const float DeltaTime = Pawn->GetWorld() ? Pawn->GetWorld()->GetDeltaSeconds() : 0.0f;
 
-	FVector2D Value = RawValue;
+	// Early out if no time has passed (should be rare).
+	if (DeltaTime <= 0.0f)
+	{
+		Pawn->AddControllerYawInput(RawValue.X);
+		Pawn->AddControllerPitchInput(RawValue.Y);
+		return;
+	}
 
-	// Time + magnitude-based acceleration for gamepad look.
+	// Deadzone and magnitude.
+	const float Mag = RawValue.Size();
+	const float DeadZone = 0.1f; // Same conceptual deadzone as Enhanced Input, but we keep it explicit here for the temporal filter.
+
+	// If under deadzone, treat as zero input for temporal state purposes.
+	const bool bStickIsCurrentlyActive = Mag > DeadZone;
+
+	// --- Time/direction state ---
+	if (bStickIsCurrentlyActive)
+	{
+		LookStickTimeSinceEngaged += DeltaTime;
+	}
+	else
+	{
+		LookStickTimeSinceEngaged = 0.0f;
+	}
+
+	// Compute per-axis ramp multiplier from the engagement time using the optional curve.
+	float TimeMultiplier = 1.0f;
 	if (LookStickAccelerationCurve)
 	{
-		const float Magnitude = RawValue.Size();
-		const float DeltaTime = World->GetDeltaSeconds();
-
-		// Deadzone "forte" para considerar o stick realmente parado.
-		constexpr float StickDeadZone = 0.10f;
-
-		if (Magnitude < StickDeadZone)
-		{
-			// Stick voltou para perto do centro: ramp-down suave e reset completo perto de zero.
-			LookStickPrevDirection = FVector2D::ZeroVector;
-
-			const float RampDownSpeed = 50.0f; // 1/s, maior = desce mais rápido
-			const float PrevMultiplier = LookStickCurrentMultiplier;
-			LookStickCurrentMultiplier = FMath::FInterpTo(LookStickCurrentMultiplier, 0.0f, DeltaTime, RampDownSpeed);
-
-			if (LookStickCurrentMultiplier <= 0.02f)
-			{
-				// Reset completo do estado para evitar acumular valor residual.
-				LookStickCurrentMultiplier = 0.0f;
-				LookStickTimeSinceEngaged = 0.0f;
-				LookStickSmoothedValue = FVector2D::ZeroVector;
-				Value = FVector2D::ZeroVector;
-
-				UE_LOG(LogLyra, VeryVerbose,
-					TEXT("[LyraHeroComponent::Input_LookStick] Final reset: Mag=%.4f PrevMult=%.4f NewMult=%.4f"),
-					Magnitude, PrevMultiplier, LookStickCurrentMultiplier);
-			}
-			else
-			{
-				Value = RawValue * LookStickCurrentMultiplier;
-
-				UE_LOG(LogLyra, VeryVerbose,
-					TEXT("[LyraHeroComponent::Input_LookStick] Deadzone ramp-down: Mag=%.4f PrevMult=%.4f NewMult=%.4f"),
-					Magnitude, PrevMultiplier, LookStickCurrentMultiplier);
-			}
-		}
-		else
-		{
-			// Stick ativo: o tempo da curva continua subindo (independente da direção)
-			// para evitar micro-trancos quando o jogador gira o stick em círculo.
-			const FVector2D Direction = RawValue / Magnitude;
-			LookStickPrevDirection = Direction;
-
-			LookStickTimeSinceEngaged += DeltaTime;
-
-			// Curve X = tempo (s), Y = multiplicador alvo base.
-			const float TimeCurveValue = FMath::Max(0.0f, LookStickAccelerationCurve->GetFloatValue(LookStickTimeSinceEngaged));
-
-			// Fator baseado na magnitude do stick: quanto mais próximo de 1, mais próximo do valor da curva.
-			// - Em Magnitude=1 -> MagnitudeFactor=1 (usa o valor cheio da curva)
-			// - Em Magnitude=0.2 -> MagnitudeFactor~0.25 (ramp-up bem mais lento)
-			// Ajuste o expoente se quiser mais/menos sensibilidade.
-			const float MagnitudeFactor = FMath::Pow(Magnitude, 1.5f);
-
-			const float TargetMultiplier = TimeCurveValue * MagnitudeFactor;
-
-			const float PrevMultiplier = LookStickCurrentMultiplier;
-			// Ramp-up base; será efetivamente mais rápido para magnitudes altas
-			// porque TargetMultiplier sobe mais rápido.
-			const float RampUpSpeed = 2.0f;
-			LookStickCurrentMultiplier = FMath::FInterpTo(LookStickCurrentMultiplier, TargetMultiplier, DeltaTime, RampUpSpeed);
-
-			Value = RawValue * LookStickCurrentMultiplier;
-
-			UE_LOG(LogLyra, Warning,
-				TEXT("[LyraHeroComponent::Input_LookStick] Active: Mag=%.3f Time=%.3f TimeCurve=%.3f MagFactor=%.3f Target=%.3f PrevMult=%.3f NewMult=%.3f"),
-				Magnitude, LookStickTimeSinceEngaged, TimeCurveValue, MagnitudeFactor, TargetMultiplier, PrevMultiplier, LookStickCurrentMultiplier);
-		}
+		// Curve X = time (seconds), Y = scalar [0,1].
+		TimeMultiplier = LookStickAccelerationCurve->GetFloatValue(LookStickTimeSinceEngaged);
 	}
 
-	// ------------------------
-	// Temporal smoothing layer
-	// ------------------------
-	// Aplica um filtro exponencial leve para reduzir jitter de pequenas correções
-	// sem alterar o comportamento existente quando a força de suavização é zero.
-	FVector2D FinalValue = Value;
+	// Combine time-based multiplier with magnitude so that small deflections ramp more gently than full deflection.
+	// This is a simple blend: effective scalar grows faster if the stick is pushed harder.
+	const float MagFactor = FMath::Clamp(Mag, 0.0f, 1.0f);
+	const float EffectiveScalar = FMath::Clamp(TimeMultiplier * (0.5f + 0.5f * MagFactor), 0.0f, 1.0f);
 
-	const float DeltaTime = World->GetDeltaSeconds();
+	// Apply acceleration multiplier to the raw value.
+	FVector2D Target = RawValue * EffectiveScalar;
 
+	// --- Temporal smoothing (per-axis exponential filter) ---
 	if (LookStickSmoothingStrength > 0.0f)
 	{
-		// Mapear LookStickSmoothingStrength [0,1] para uma "velocidade" de suavização em 1/s.
-		// Valores típicos: 0.0 = sem filtro, 0.3 ~ 0.5 = filtro leve.
-		const float MinSmoothingSpeed = 10.0f;
-		const float MaxExtraSmoothingSpeed = 40.0f;
-		const float SmoothingSpeed = MinSmoothingSpeed + (MaxExtraSmoothingSpeed * FMath::Clamp(LookStickSmoothingStrength, 0.0f, 1.0f));
+		// Convert smoothing strength (seconds) to a blend alpha per frame.
+		// Strength is interpreted as the time to reach ~63% of the target (1 - 1/e).
+		const float Tau = FMath::Max(LookStickSmoothingStrength, KINDA_SMALL_NUMBER);
+		const float Alpha = FMath::Clamp(DeltaTime / Tau, 0.0f, 1.0f);
 
-		const float Alpha = 1.0f - FMath::Exp(-SmoothingSpeed * DeltaTime);
-
-		FVector2D Target = Value;
-
-		// Atualiza valor suavizado.
-		LookStickSmoothedValue = FMath::Lerp(LookStickSmoothedValue, Target, Alpha);
-
-		// Opcional: limitar velocidade máxima de variação em graus/segundo, se configurado.
-		if (LookStickSmoothingMaxLagDegreesPerSec > 0.0f)
+		// When direction flips (sign change), allow the sign to flip immediately to avoid "pulling" in the wrong direction.
+		// We only smooth the magnitude in that case.
 		{
-			// Converte delta em algo aproximado a deg/s usando os rates atuais.
-			FVector2D DeltaStick = LookStickSmoothedValue - FinalValue;
-			const float MaxDeltaYawDeg = LookStickSmoothingMaxLagDegreesPerSec * DeltaTime / LyraHero::LookYawRate;
-			const float MaxDeltaPitchDeg = LookStickSmoothingMaxLagDegreesPerSec * DeltaTime / LyraHero::LookPitchRate;
+			float PrevX = static_cast<float>(LookStickSmoothedValue.X);
+			float PrevY = static_cast<float>(LookStickSmoothedValue.Y);
 
-			DeltaStick.X = FMath::Clamp(DeltaStick.X, -MaxDeltaYawDeg, MaxDeltaYawDeg);
-			DeltaStick.Y = FMath::Clamp(DeltaStick.Y, -MaxDeltaPitchDeg, MaxDeltaPitchDeg);
+			const float TgtX = Target.X;
+			const float TgtY = Target.Y;
 
-			LookStickSmoothedValue = FinalValue + DeltaStick;
+			auto SmoothAxis = [DeltaTime, Tau, Alpha](float Prev, float Tgt)
+			{
+				if (FMath::IsNearlyZero(Tgt))
+				{
+					// No input on this axis: decay smoothly toward zero.
+					return FMath::FInterpTo(Prev, 0.0f, DeltaTime, 1.0f / Tau);
+				}
+				else if (FMath::Sign(Prev) != FMath::Sign(Tgt))
+				{
+					// Direction changed: flip sign immediately, only smooth magnitude.
+					const float PrevMag = FMath::Abs(Prev);
+					const float TgtMag = FMath::Abs(Tgt);
+					const float NewMag = PrevMag + (TgtMag - PrevMag) * Alpha;
+					return NewMag * FMath::Sign(Tgt);
+				}
+				else
+				{
+					// Same direction: standard exponential smoothing.
+					return Prev + (Tgt - Prev) * Alpha;
+				}
+			};
+
+			PrevX = SmoothAxis(PrevX, TgtX);
+			PrevY = SmoothAxis(PrevY, TgtY);
+
+			LookStickSmoothedValue.X = PrevX;
+			LookStickSmoothedValue.Y = PrevY;
 		}
 
-		FinalValue = LookStickSmoothedValue;
+		// Optional clamp on maximum delta per second in normalized stick space.
+		if (LookStickSmoothingMaxDeltaPerSecond > 0.0f)
+		{
+			const FVector2D Delta = LookStickSmoothedValue - Target;
+			const float MaxDelta = LookStickSmoothingMaxDeltaPerSecond * DeltaTime;
+			if (Delta.SizeSquared() > MaxDelta * MaxDelta)
+			{
+				const FVector2D ClampedDelta = Delta.GetSafeNormal() * MaxDelta;
+				LookStickSmoothedValue = Target + ClampedDelta;
+			}
+		}
+	}
+	else
+	{
+		// No temporal smoothing requested: still apply the acceleration curve.
+		LookStickSmoothedValue = Target;
 	}
 
-	if (FinalValue.X != 0.0f)
+	// Optional additional clamp so that smoothing never causes more than X deg/s of lag relative to raw input.
+	if (LookStickSmoothingMaxLagDegreesPerSec > 0.0f)
 	{
-		Pawn->AddControllerYawInput(FinalValue.X * LyraHero::LookYawRate * DeltaTime);
+		// Map normalized stick units to degrees/second using the character's look rates.
+		// Assume X = yaw, Y = pitch.
+		const float CurrentYawDegPerSec = LookStickSmoothedValue.X * LyraHero::LookYawRate;
+		const float TargetYawDegPerSec  = Target.X                 * LyraHero::LookYawRate;
+
+		const float CurrentPitchDegPerSec = LookStickSmoothedValue.Y * LyraHero::LookPitchRate;
+		const float TargetPitchDegPerSec  = Target.Y                 * LyraHero::LookPitchRate;
+
+		const float MaxDeltaYawDeg   = LookStickSmoothingMaxLagDegreesPerSec * DeltaTime;
+		const float MaxDeltaPitchDeg = LookStickSmoothingMaxLagDegreesPerSec * DeltaTime;
+
+		const float DesiredDeltaYawDeg   = TargetYawDegPerSec  - CurrentYawDegPerSec;
+		const float DesiredDeltaPitchDeg = TargetPitchDegPerSec - CurrentPitchDegPerSec;
+
+		const float ClampedDeltaYawDeg   = FMath::Clamp(DesiredDeltaYawDeg,   -MaxDeltaYawDeg,   MaxDeltaYawDeg);
+		const float ClampedDeltaPitchDeg = FMath::Clamp(DesiredDeltaPitchDeg, -MaxDeltaPitchDeg, MaxDeltaPitchDeg);
+
+		const float NewYawDegPerSec   = CurrentYawDegPerSec   + ClampedDeltaYawDeg;
+		const float NewPitchDegPerSec = CurrentPitchDegPerSec + ClampedDeltaPitchDeg;
+
+		// Convert back to normalized stick units.
+		LookStickSmoothedValue.X = NewYawDegPerSec   / LyraHero::LookYawRate;
+		LookStickSmoothedValue.Y = NewPitchDegPerSec / LyraHero::LookPitchRate;
 	}
 
-	if (FinalValue.Y != 0.0f)
-	{
-		Pawn->AddControllerPitchInput(FinalValue.Y * LyraHero::LookPitchRate * DeltaTime);
-	}
+	// Apply to controller using the smoothed, accelerated stick value.
+	Pawn->AddControllerYawInput(LookStickSmoothedValue.X);
+	Pawn->AddControllerPitchInput(LookStickSmoothedValue.Y);
 }
 
 void ULyraHeroComponent::Input_Crouch(const FInputActionValue& InputActionValue)

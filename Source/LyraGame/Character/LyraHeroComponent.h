@@ -119,6 +119,29 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera", meta=(DisplayName="Gamepad Look Stick Acceleration Curve"))
 	class UCurveFloat* LookStickAccelerationCurve = nullptr;
 
+	/** Strength of the temporal smoothing filter applied to the right stick look input (gamepad only).
+	 * 0.0 = disabled (original behaviour, no additional temporal smoothing).
+	 * 1.0 = strong smoothing (more stable but slower to respond to big changes).
+	 *
+	 * This is evaluated in C++ when handling `IA_Look_Stick` and can be tweaked in blueprints per-hero.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera")
+	float LookStickSmoothingStrength = 0.0f;
+
+	/** Optional maximum rate, in normalized stick units per second, at which the smoothed
+	 * look value is allowed to change. 0.0 means "no explicit clamp", only the
+	 * exponential smoothing defined by LookStickSmoothingStrength is used.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera")
+	float LookStickSmoothingMaxDeltaPerSecond = 0.0f;
+
+	/** Optional clamp for how quickly the temporal smoothing is allowed to lag behind the
+	 * raw stick input, expressed in degrees/second of camera rotation. Set to 0 to disable
+	 * this clamp and rely purely on the exponential smoothing + ramp curve.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Hero|Camera")
+	float LookStickSmoothingMaxLagDegreesPerSec = 0.0f;
+
 	/** Reinitialize input bindings for this hero using the current pawn InputComponent, if available. */
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Hero|Input")
 	void ReinitializePlayerInput();
@@ -141,25 +164,6 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Lyra|Hero")
 	bool bReadyToBindInputs;
 
-	/** Força do filtro temporal exponencial aplicado à entrada do stick direito.
-	 * 0.0 = desativado (comportamento original, sem atraso adicional).
-	 * 1.0 = suavização forte (mais estável, porém mais lenta para grandes correções).
-	 */
-	UPROPERTY(EditAnywhere, Category = "Hero|Input|Look|Stick", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float LookStickSmoothingStrength = 0.0f;
-
-	/**
-	 * Limite opcional de variação máxima por segundo (em graus/segundo) do valor suavizado.
-	 * 0.0 = sem limite extra (usa apenas o filtro exponencial).
-	 * Use valores como 720-1080 para limitar a "cauda" da suavização sem afetar giros rápidos.
-	 */
-	UPROPERTY(EditAnywhere, Category = "Hero|Input|Look|Stick", meta = (ClampMin = "0.0"))
-	float LookStickSmoothingMaxLagDegreesPerSec = 0.0f;
-
-	/** Valor suavizado temporalmente do stick direito (em unidades normalizadas de stick). */
-	UPROPERTY(Transient)
-	FVector2D LookStickSmoothedValue = FVector2D::ZeroVector;
-
 	// Time-based state for right-stick look acceleration (gamepad only).
 	UPROPERTY(Transient)
 	float LookStickTimeSinceEngaged = 0.0f;
@@ -170,4 +174,10 @@ protected:
 	// Cached multiplier used for smooth ramp-down when the stick is released.
 	UPROPERTY(Transient)
 	float LookStickCurrentMultiplier = 0.0f;
+
+	/** Temporally smoothed right-stick value used by Input_LookStick (after deadzone and acceleration).
+	 * Stored in normalized stick units, not in degrees/second.
+	 */
+	UPROPERTY(Transient)
+	FVector2D LookStickSmoothedValue = FVector2D::ZeroVector;
 };
