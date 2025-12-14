@@ -485,76 +485,103 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 	{
 		return;
 	}
-
-	const FVector2D RawValue = InputActionValue.Get<FVector2D>();
-	const float DeltaTime = Pawn->GetWorld() ? Pawn->GetWorld()->GetDeltaSeconds() : 0.0f;
-
-	if (DeltaTime <= 0.0f)
-	{
-		Pawn->AddControllerYawInput(RawValue.X);
-		Pawn->AddControllerPitchInput(RawValue.Y);
-		return;
-	}
-
-	// Deadzone and magnitude
-	const float Mag = RawValue.Size();
-	const float DeadZone = 0.1f;
-	const bool bStickIsCurrentlyActive = Mag > DeadZone;
-
-	// Time state for optional acceleration curve
-	if (bStickIsCurrentlyActive)
-	{
-		// Avança o tempo base em função de DeltaTime, mas a velocidade de avanço
-		// efetiva na curva será modulada pela magnitude do stick mais abaixo.
-		LookStickTimeSinceEngaged += DeltaTime;
-	}
-	else
-	{
-		LookStickTimeSinceEngaged = 0.0f;
-	}
-
-	// Base target from raw stick (with deadzone applied)
-	FVector2D Target = RawValue;
-	if (!bStickIsCurrentlyActive)
-	{
-		Target = FVector2D::ZeroVector;
-	}
-
-	float NormalizedMag = 0.0f;
-	float CurveValue = 1.0f;
-
-	// Optional acceleration curve with magnitude-based ramp speed modulation
-	if (LookStickAccelerationCurve && bStickIsCurrentlyActive)
-	{
-		// Normaliza a magnitude (0..1) ignorando o trechinho da deadzone.
-		// Assim, logo após sair da deadzone a influência é baixa e aumenta
-		// progressivamente até 1.0 com o stick totalmente empurrado.
-		NormalizedMag = FMath::Clamp((Mag - DeadZone) / (1.0f - DeadZone), 0.0f, 1.0f);
-
-		// A magnitude do stick controla a VELOCIDADE com que avançamos na curva:
-		// - NormalizedMag pequeno  -> tempo efetivo cresce devagar (rampa lenta)
-		// - NormalizedMag grande   -> tempo efetivo cresce rápido (rampa rápida)
-		const float EffectiveTime = LookStickTimeSinceEngaged * FMath::Max(NormalizedMag, KINDA_SMALL_NUMBER);
-
-		CurveValue = LookStickAccelerationCurve->GetFloatValue(EffectiveTime);
-		float TimeMultiplier = FMath::Clamp(CurveValue, 0.0f, 1.5f);
-
-		// Aplica o multiplicador de tempo ao valor alvo do stick.
-		Target *= TimeMultiplier;
-	}
 	
-	// Magnitude final aplicada ao look depois do ramp
-	const float FinalMag = Target.Size();
+	FVector2D RawValue = InputActionValue.Get<FVector2D>();
 
-	// Log de debug para inspecionar o comportamento do look stick
-	UE_LOG(LogLyra, Warning, TEXT("LookStick: RawMag=%.3f NormalizedMag=%.3f CurveValue=%.3f FinalMag=%.3f"), Mag, NormalizedMag, CurveValue, FinalMag);
+	const UWorld* World = GetWorld();
+	check(World);
+
+	FVector2D Value = RawValue;
+
+	// Time + magnitude-based acceleration for gamepad look.
+	if (LookStickAccelerationCurve)
+	{
+		const float Magnitude = RawValue.Size();
+		const float DeltaTime = World->GetDeltaSeconds();
+
+		// Deadzone "forte" para considerar o stick realmente parado.
+		constexpr float StickDeadZone = 0.10f;
+
+		if (Magnitude < StickDeadZone)
+		{
+			// Stick voltou para perto do centro: ramp-down suave e reset completo perto de zero.
+			LookStickPrevDirection = FVector2D::ZeroVector;
+
+			const float RampDownSpeed = 50.0f; // 1/s, maior = desce mais rápido
+			const float PrevMultiplier = LookStickCurrentMultiplier;
+			LookStickCurrentMultiplier = FMath::FInterpTo(LookStickCurrentMultiplier, 0.0f, DeltaTime, RampDownSpeed);
+
+			if (LookStickCurrentMultiplier <= 0.02f)
+			{
+				// Reset completo do estado para evitar acumular valor residual.
+				LookStickCurrentMultiplier = 0.0f;
+				LookStickTimeSinceEngaged = 0.0f;
+				LookStickSmoothedValue = FVector2D::ZeroVector;
+				Value = FVector2D::ZeroVector;
+
+				UE_LOG(LogLyra, VeryVerbose,
+					TEXT("[LyraHeroComponent::Input_LookStick] Final reset: Mag=%.4f PrevMult=%.4f NewMult=%.4f"),
+					Magnitude, PrevMultiplier, LookStickCurrentMultiplier);
+			}
+			else
+			{
+				Value = RawValue * LookStickCurrentMultiplier;
+
+				UE_LOG(LogLyra, VeryVerbose,
+					TEXT("[LyraHeroComponent::Input_LookStick] Deadzone ramp-down: Mag=%.4f PrevMult=%.4f NewMult=%.4f"),
+					Magnitude, PrevMultiplier, LookStickCurrentMultiplier);
+			}
+		}
+		else
+		{
+			// Stick ativo: o tempo da curva continua subindo (independente da direção)
+			// para evitar micro-trancos quando o jogador gira o stick em círculo.
+			const FVector2D Direction = RawValue / Magnitude;
+			LookStickPrevDirection = Direction;
+
+			LookStickTimeSinceEngaged += DeltaTime;
+
+			// Curve X = tempo (s), Y = multiplicador alvo base.
+			const float TimeCurveValue = FMath::Max(0.0f, LookStickAccelerationCurve->GetFloatValue(LookStickTimeSinceEngaged));
+
+			// Fator baseado na magnitude do stick: quanto mais próximo de 1, mais próximo do valor da curva.
+			// - Em Magnitude=1 -> MagnitudeFactor=1 (usa o valor cheio da curva)
+			// - Em Magnitude=0.2 -> MagnitudeFactor~0.25 (ramp-up bem mais lento)
+			// Ajuste o expoente se quiser mais/menos sensibilidade.
+			const float MagnitudeFactor = FMath::Pow(Magnitude, 1.5f);
+
+			const float TargetMultiplier = TimeCurveValue * MagnitudeFactor;
+
+			const float PrevMultiplier = LookStickCurrentMultiplier;
+			// Ramp-up base; será efetivamente mais rápido para magnitudes altas
+			// porque TargetMultiplier sobe mais rápido.
+			const float RampUpSpeed = 2.0f;
+			LookStickCurrentMultiplier = FMath::FInterpTo(LookStickCurrentMultiplier, TargetMultiplier, DeltaTime, RampUpSpeed);
+
+			Value = RawValue * LookStickCurrentMultiplier;
+
+		}
+	}
+
+	// ------------------------
+	// Temporal smoothing layer
+	// ------------------------
+	// Aplica um filtro exponencial leve para reduzir jitter de pequenas correções
+	// sem alterar o comportamento existente quando a força de suavização é zero.
+	FVector2D FinalValue = Value;
+
+	const float DeltaTime = World->GetDeltaSeconds();
 	
-	LookStickSmoothedValue = Target;
+	if (FinalValue.X != 0.0f)
+	{
+		Pawn->AddControllerYawInput(FinalValue.X * LyraHero::LookYawRate * DeltaTime);
+	}
 
-	Pawn->AddControllerYawInput(LookStickSmoothedValue.X);
-	Pawn->AddControllerPitchInput(LookStickSmoothedValue.Y);
+	if (FinalValue.Y != 0.0f)
+	{
+		Pawn->AddControllerPitchInput(FinalValue.Y * LyraHero::LookPitchRate * DeltaTime);
+	}
 }
-
 void ULyraHeroComponent::Input_Crouch(const FInputActionValue& InputActionValue)
 {
 	if (ALyraCharacter* Character = GetPawn<ALyraCharacter>())
