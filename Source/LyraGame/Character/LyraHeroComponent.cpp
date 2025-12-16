@@ -435,6 +435,23 @@ void ULyraHeroComponent::Input_Move(const FInputActionValue& InputActionValue)
 	{
 		LyraController->SetIsAutoRunning(false);
 	}
+
+	// If the hero is in cover, skip the normal movement handling.
+	if (Pawn)
+	{
+		if (const ULyraPawnExtensionComponent* PawnExtComp = ULyraPawnExtensionComponent::FindPawnExtensionComponent(Pawn))
+		{
+			if (const ULyraAbilitySystemComponent* LyraASC = PawnExtComp->GetLyraAbilitySystemComponent())
+			{
+				// Check the Status.Cover gameplay tag (defined in DefaultGameplayTags.ini).
+				static const FGameplayTag CoverTag = FGameplayTag::RequestGameplayTag(FName(TEXT("Status.Cover")));
+				if (LyraASC->HasMatchingGameplayTag(CoverTag))
+				{
+					return; // Custom cover movement is handled in Blueprint.
+				}
+			}
+		}
+	}
 	
 	if (Controller)
 	{
