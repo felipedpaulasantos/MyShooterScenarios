@@ -83,7 +83,7 @@ public:
 	//Check for pawns standing on pad when the weapon is spawned. 
 	void CheckForExistingOverlaps();
 
-	UFUNCTION(BlueprintNativeEvent)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 	void AttemptPickUpWeapon(APawn* Pawn);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Lyra|WeaponPickup")
