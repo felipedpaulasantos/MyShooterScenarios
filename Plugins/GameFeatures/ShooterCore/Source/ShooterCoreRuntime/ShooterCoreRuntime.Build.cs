@@ -52,7 +52,8 @@ public class ShooterCoreRuntime : ModuleRules
 				"EnhancedInput",
 				"GameSubtitles",
 				"DeveloperSettings",
-				"AIModule"
+				"AIModule",
+				"PCG"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);

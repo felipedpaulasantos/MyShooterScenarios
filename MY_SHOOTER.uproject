@@ -357,6 +357,10 @@
 		{
 			"Name": "AnimationToolsBundle",
 			"Enabled": true
+		},
+		{
+			"Name": "LudusAI",
+			"Enabled": true
 		}
 	],
 	"EpicSampleNameHash": "451731683"
