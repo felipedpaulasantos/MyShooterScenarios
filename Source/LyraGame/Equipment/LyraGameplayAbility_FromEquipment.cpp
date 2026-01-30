@@ -17,6 +17,15 @@ ULyraGameplayAbility_FromEquipment::ULyraGameplayAbility_FromEquipment(const FOb
 
 ULyraEquipmentInstance* ULyraGameplayAbility_FromEquipment::GetAssociatedEquipment() const
 {
+	// This helper is used by cost checks and other pre-activation paths.
+	// Those paths can run on the CDO (or on non-instanced abilities) where GetCurrentAbilitySpec() is invalid.
+	if (!IsInstantiated())
+	{
+		// If we’re not instantiated, we can’t safely read CurrentSpecHandle.
+		// Callers should use handle+actor info based access instead.
+		return nullptr;
+	}
+
 	if (FGameplayAbilitySpec* Spec = UGameplayAbility::GetCurrentAbilitySpec())
 	{
 		return Cast<ULyraEquipmentInstance>(Spec->SourceObject.Get());
