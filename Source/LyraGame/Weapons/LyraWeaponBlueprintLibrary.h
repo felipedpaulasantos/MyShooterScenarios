@@ -6,6 +6,8 @@
 
 class AActor;
 class ULyraWeaponInstance;
+class ULyraRangedWeaponInstance;
+class ALyraCharacter;
 
 /**
  * Blueprint helpers for Lyra weapons.
@@ -32,4 +34,14 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Lyra|Weapons", meta=(DefaultToSelf="Actor", ExpandBoolAsExecs="ReturnValue", DisplayName="Has Equipped Weapon Of Class", Keywords="Lyra Weapon Equipped HasWeapon Class B_WeaponInstanceBase"))
 	static bool HasEquippedWeaponOfClass(const AActor* Actor, TSubclassOf<ULyraWeaponInstance> InstanceClass, ULyraWeaponInstance*& OutWeaponInstance);
+
+	/**
+	 * Adds ammo to an equipped ranged weapon instance matching WeaponClass.
+	 *
+	 * Notes:
+	 * - Server-authoritative: will no-op and return false if called on a non-authority character.
+	 * - Ammo is clamped to MaxAmmo if a MaxAmmo attribute exists (ammo storage is project-specific).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Lyra|Weapons", meta=(DefaultToSelf="LyraCharacter", ExpandBoolAsExecs="ReturnValue", DisplayName="Add Ammo To Weapon By Class", Keywords="Lyra Weapon Ammo Add Give Ranged", AdvancedDisplay="OutActualAmmoAdded"))
+	static bool AddAmmoToWeaponByClass(ALyraCharacter* LyraCharacter, TSubclassOf<ULyraRangedWeaponInstance> WeaponClass, float AmmoToAdd, ULyraRangedWeaponInstance*& OutWeaponInstance, float& OutActualAmmoAdded);
 };
