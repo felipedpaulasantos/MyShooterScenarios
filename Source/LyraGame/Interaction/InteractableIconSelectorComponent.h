@@ -5,6 +5,17 @@
 #include "Components/ActorComponent.h"
 #include "Engine/EngineTypes.h" // FOverlapResult
 #include "InteractableIconSelectorComponent.generated.h"
+
+UENUM(BlueprintType)
+enum class EInteractableIconPositionScoreMode : uint8
+{
+	/** Usa projeção em tela e favorece o que está mais perto do centro do viewport. */
+	ScreenCenter UMETA(DisplayName = "Screen Center"),
+
+	/** Usa o Forward Vector do Pawn (ou Owner) e favorece o que está mais à frente do Pawn. */
+	PawnForward UMETA(DisplayName = "Pawn Forward")
+};
+
 class AActor;
 /**
  * Periodically selects the best interactable (by front/center/visibility score)
@@ -131,4 +142,23 @@ private:
 	 * Only valid within the current scan and only used for debug.
 	 */
 	mutable FString LastRejectReason;
+
+	/** Define como o score de posicionamento deve ser calculado (centro da tela ou forward do pawn). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Scoring", meta = (AllowPrivateAccess = "true"))
+	EInteractableIconPositionScoreMode PositionScoreMode = EInteractableIconPositionScoreMode::ScreenCenter;
+
+	/**
+	 * Se true, mesmo no modo PawnForward o candidato precisa estar on-screen (projeta e rejeita se estiver fora).
+	 * Útil para evitar selecionar interagíveis atrás/frente mas fora do FOV/viewport.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Scoring", meta = (AllowPrivateAccess = "true"))
+	bool bRejectOffScreenInPawnForwardMode = true;
+
+	/**
+	 * No modo ScreenCenter, rejeita candidatos cuja projeção esteja muito longe do centro do viewport.
+	 * Valor normalizado (0..1) baseado na meia-diagonal do viewport: 0 = exatamente no centro, 1 = no limite da meia-diagonal.
+	 * Ex: 0.25 tende a exigir que o alvo permaneça relativamente próximo ao centro pra manter o ícone.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Scoring", meta = (AllowPrivateAccess = "true", ClampMin = "0.0", ClampMax = "1.0"))
+	float ScreenCenterMaxNormalizedDistance = 0.35f;
 };

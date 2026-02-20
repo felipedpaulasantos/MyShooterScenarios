@@ -325,35 +325,6 @@ float UInteractableIconSelectorComponent::ScoreCandidate(AActor* Candidate, cons
 		return -1.0f;
 	}
 
-	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
-	if (!PC)
-	{
-		LastRejectReason = TEXT("NoPlayerController");
-		return -1.0f;
-	}
-
-	// Project to screen and reject off-screen candidates.
-	FVector2D ScreenPos(0.0f, 0.0f);
-	const bool bProjected = PC->ProjectWorldLocationToScreen(TargetLoc, ScreenPos, true);
-	if (!bProjected || ViewportSize.X <= 0.0f || ViewportSize.Y <= 0.0f)
-	{
-		LastRejectReason = FString::Printf(TEXT("ProjectFailOrBadViewport(Projected=%d VP=%.0fx%.0f)"), bProjected ? 1 : 0, ViewportSize.X, ViewportSize.Y);
-		return -1.0f;
-	}
-
-	const bool bOnScreen = (ScreenPos.X >= 0.0f) && (ScreenPos.X <= ViewportSize.X) && (ScreenPos.Y >= 0.0f) && (ScreenPos.Y <= ViewportSize.Y);
-	if (!bOnScreen)
-	{
-		LastRejectReason = FString::Printf(TEXT("OffScreen(Screen=%.0f,%.0f VP=%.0f,%.0f)"), ScreenPos.X, ScreenPos.Y, ViewportSize.X, ViewportSize.Y);
-		return -1.0f;
-	}
-
-	// Screen center score (0..1)
-	const float DistToCenter = FVector2D::Distance(ScreenPos, ViewportCenter);
-	const float HalfDiag = 0.5f * FMath::Sqrt(ViewportSize.X * ViewportSize.X + ViewportSize.Y * ViewportSize.Y);
-	const float NormalizedCenterDist = (HalfDiag > 0.0f) ? FMath::Clamp(DistToCenter / HalfDiag, 0.0f, 1.0f) : 1.0f;
-	const float CenterScore = 1.0f - NormalizedCenterDist;
-
 	// Distance score (0..1) where closer is better.
 	const float NormalizedDist = FMath::Clamp(Dist / FMath::Max(MaxScanDistance, 1.0f), 0.0f, 1.0f);
 	const float DistanceScore = 1.0f - NormalizedDist;
@@ -366,12 +337,86 @@ float UInteractableIconSelectorComponent::ScoreCandidate(AActor* Candidate, cons
 		return -1.0f;
 	}
 
-	// --- Priority: Visibility > Center > Distance ---
+	float PositionScore = 0.0f;
+
+	if (PositionScoreMode == EInteractableIconPositionScoreMode::PawnForward)
+	{
+		// Optional off-screen rejection even in PawnForward mode.
+		if (bRejectOffScreenInPawnForwardMode)
+		{
+			APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+			if (!PC)
+			{
+				LastRejectReason = TEXT("NoPlayerController");
+				return -1.0f;
+			}
+
+			FVector2D ScreenPos(0.0f, 0.0f);
+			const bool bProjected = PC->ProjectWorldLocationToScreen(TargetLoc, ScreenPos, true);
+			if (!bProjected || ViewportSize.X <= 0.0f || ViewportSize.Y <= 0.0f)
+			{
+				LastRejectReason = FString::Printf(TEXT("ProjectFailOrBadViewport(Projected=%d VP=%.0fx%.0f)"), bProjected ? 1 : 0, ViewportSize.X, ViewportSize.Y);
+				return -1.0f;
+			}
+
+			const bool bOnScreen = (ScreenPos.X >= 0.0f) && (ScreenPos.X <= ViewportSize.X) && (ScreenPos.Y >= 0.0f) && (ScreenPos.Y <= ViewportSize.Y);
+			if (!bOnScreen)
+			{
+				LastRejectReason = FString::Printf(TEXT("OffScreen(Screen=%.0f,%.0f VP=%.0f,%.0f)"), ScreenPos.X, ScreenPos.Y, ViewportSize.X, ViewportSize.Y);
+				return -1.0f;
+			}
+		}
+
+		// Pure forward-based score. ForwardDot is already >= MinForwardDotToConsider.
+		// Remap [-1..1] to [0..1] for nicer readability.
+		PositionScore = (ForwardDot + 1.0f) * 0.5f;
+	}
+	else // ScreenCenter
+	{
+		APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+		if (!PC)
+		{
+			LastRejectReason = TEXT("NoPlayerController");
+			return -1.0f;
+		}
+
+		// Project to screen and reject off-screen candidates.
+		FVector2D ScreenPos(0.0f, 0.0f);
+		const bool bProjected = PC->ProjectWorldLocationToScreen(TargetLoc, ScreenPos, true);
+		if (!bProjected || ViewportSize.X <= 0.0f || ViewportSize.Y <= 0.0f)
+		{
+			LastRejectReason = FString::Printf(TEXT("ProjectFailOrBadViewport(Projected=%d VP=%.0fx%.0f)"), bProjected ? 1 : 0, ViewportSize.X, ViewportSize.Y);
+			return -1.0f;
+		}
+
+		const bool bOnScreen = (ScreenPos.X >= 0.0f) && (ScreenPos.X <= ViewportSize.X) && (ScreenPos.Y >= 0.0f) && (ScreenPos.Y <= ViewportSize.Y);
+		if (!bOnScreen)
+		{
+			LastRejectReason = FString::Printf(TEXT("OffScreen(Screen=%.0f,%.0f VP=%.0f,%.0f)"), ScreenPos.X, ScreenPos.Y, ViewportSize.X, ViewportSize.Y);
+			return -1.0f;
+		}
+
+		// Screen center score (0..1)
+		const float DistToCenter = FVector2D::Distance(ScreenPos, ViewportCenter);
+		const float HalfDiag = 0.5f * FMath::Sqrt(ViewportSize.X * ViewportSize.X + ViewportSize.Y * ViewportSize.Y);
+		const float NormalizedCenterDist = (HalfDiag > 0.0f) ? FMath::Clamp(DistToCenter / HalfDiag, 0.0f, 1.0f) : 1.0f;
+
+		// Hard reject when too far from the center (makes icons drop quickly when player looks away).
+		if (NormalizedCenterDist > ScreenCenterMaxNormalizedDistance)
+		{
+			LastRejectReason = FString::Printf(TEXT("TooFarFromCenter(%.3f>%.3f)"), NormalizedCenterDist, ScreenCenterMaxNormalizedDistance);
+			return -1.0f;
+		}
+
+		PositionScore = 1.0f - NormalizedCenterDist;
+	}
+
+	// --- Priority: Visibility > Position > Distance ---
 	const float VisibilityTerm = bOutVisible ? 1000.0f : 0.0f;
-	const float CenterTerm = CenterScore * 100.0f;
+	const float PositionTerm = PositionScore * 100.0f;
 	const float DistanceTerm = DistanceScore * 10.0f;
 
-	return VisibilityTerm + CenterTerm + DistanceTerm;
+	return VisibilityTerm + PositionTerm + DistanceTerm;
 }
 
 void UInteractableIconSelectorComponent::ScanAndApply()
