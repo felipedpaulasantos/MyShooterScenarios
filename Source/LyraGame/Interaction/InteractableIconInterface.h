@@ -30,8 +30,16 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction|Icon")
 	void SetIconVisibility(bool bVisible);
 
+	/**
+	 * Show/hide the icon and provide the local player distance (cm) to the interactable.
+	 *
+	 * Added as a non-breaking V2 API: implement this in new/updated actors/Blueprints.
+	 * Callers should fallback to SetIconVisibility(bool) when this isn't implemented.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction|Icon")
+	void SetIconVisibilityWithDistance(bool bVisible, float PlayerDistance);
+
 	/** Optional: override where the icon/trace should aim (defaults to ActorLocation if not overridden). */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction|Icon")
 	FVector GetIconWorldLocation() const;
 };
-

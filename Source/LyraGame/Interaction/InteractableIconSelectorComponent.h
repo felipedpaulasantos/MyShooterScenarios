@@ -103,6 +103,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
 		FName BPI_SetIconVisibilityFuncName = TEXT("SetIconVisibility");
 
+	/** Name of the BPI function that sets icon visibility + player distance (bool + float params). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
+		FName BPI_SetIconVisibilityWithDistanceFuncName = TEXT("SetIconVisibilityWithDistance");
+
 	/** Optional: name of the BPI function that returns the icon world location (FVector). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
 		FName BPI_GetIconWorldLocationFuncName = TEXT("GetIconWorldLocation");
@@ -110,11 +114,13 @@ private:
 	bool DoesActorImplementBPI(AActor* Actor) const;
 	float GetMinimumDistanceViaBPI(AActor* Actor) const;
 	void SetIconVisibilityViaBPI(AActor* Actor, bool bVisible) const;
+	void SetIconVisibilityWithDistanceViaBPI(AActor* Actor, bool bVisible, float PlayerDistance) const;
 	bool GetIconWorldLocationViaBPI(AActor* Actor, FVector& OutLocation) const;
 
 	bool IsInteractableActor(AActor* Actor) const;
 	float GetMinimumDistanceToShow(AActor* Actor) const;
 	void SetIconVisibilityOnActor(AActor* Actor, bool bVisible) const;
+	void SetIconVisibilityOnActor(AActor* Actor, bool bVisible, float PlayerDistance) const;
 	FVector GetIconWorldLocationFromActor(AActor* Actor) const;
 
 	/** Actors that were considered in the previous scan. Used to hide icons when they drop out of range/filters. */

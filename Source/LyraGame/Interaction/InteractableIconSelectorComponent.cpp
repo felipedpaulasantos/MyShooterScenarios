@@ -551,6 +551,9 @@ void UInteractableIconSelectorComponent::ScanAndApply()
 
 void UInteractableIconSelectorComponent::ApplySelection(AActor* NewBestActor, const TArray<AActor*>& ConsideredActors)
 {
+	// Compute view location once; used for distance.
+	const FVector ViewLoc = GetViewLocation();
+
 	for (AActor* Actor : ConsideredActors)
 	{
 		if (!Actor || !IsInteractableActor(Actor))
@@ -559,7 +562,16 @@ void UInteractableIconSelectorComponent::ApplySelection(AActor* NewBestActor, co
 		}
 
 		const bool bShouldBeVisible = (Actor == NewBestActor);
-		SetIconVisibilityOnActor(Actor, bShouldBeVisible);
+		if (bShouldBeVisible)
+		{
+			const FVector TargetLoc = GetCandidateIconLocation(Actor);
+			const float PlayerDistance = FVector::Dist(ViewLoc, TargetLoc);
+			SetIconVisibilityOnActor(Actor, true, PlayerDistance);
+		}
+		else
+		{
+			SetIconVisibilityOnActor(Actor, false);
+		}
 	}
 
 	// Also make sure the old best gets hidden if it left the overlap list.
@@ -576,7 +588,9 @@ void UInteractableIconSelectorComponent::ApplySelection(AActor* NewBestActor, co
 
 bool UInteractableIconSelectorComponent::DoesActorImplementBPI(AActor* Actor) const
 {
-	return Actor && InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityFuncName) != nullptr;
+	return Actor && (
+		InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityFuncName) != nullptr ||
+		InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityWithDistanceFuncName) != nullptr);
 }
 
 float UInteractableIconSelectorComponent::GetMinimumDistanceViaBPI(AActor* Actor) const
@@ -592,14 +606,38 @@ float UInteractableIconSelectorComponent::GetMinimumDistanceViaBPI(AActor* Actor
 		return 0.0f;
 	}
 
-	struct FParams
-	{
-		float ReturnValue = 0.0f;
-	};
+	uint8* Buffer = (uint8*)FMemory_Alloca(Func->ParmsSize);
+	FMemory::Memzero(Buffer, Func->ParmsSize);
 
-	FParams Params;
-	Actor->ProcessEvent(Func, &Params);
-	return Params.ReturnValue;
+	Actor->ProcessEvent(Func, Buffer);
+
+	// Read return value via property to avoid relying on a locally-defined struct layout.
+	if (FProperty* ReturnProp = Func->GetReturnProperty())
+	{
+		if (FFloatProperty* FloatProp = CastField<FFloatProperty>(ReturnProp))
+		{
+			return FloatProp->GetPropertyValue_InContainer(Buffer);
+		}
+		if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(ReturnProp))
+		{
+			return (float)DoubleProp->GetPropertyValue_InContainer(Buffer);
+		}
+	}
+
+	// Fallback: try by name (older UFunction layouts)
+	if (FProperty* ReturnByName = Func->FindPropertyByName(TEXT("ReturnValue")))
+	{
+		if (FFloatProperty* FloatProp = CastField<FFloatProperty>(ReturnByName))
+		{
+			return FloatProp->GetPropertyValue_InContainer(Buffer);
+		}
+		if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(ReturnByName))
+		{
+			return (float)DoubleProp->GetPropertyValue_InContainer(Buffer);
+		}
+	}
+
+	return 0.0f;
 }
 
 void UInteractableIconSelectorComponent::SetIconVisibilityViaBPI(AActor* Actor, bool bVisible) const
@@ -623,6 +661,48 @@ void UInteractableIconSelectorComponent::SetIconVisibilityViaBPI(AActor* Actor, 
 	FParams Params;
 	Params.bVisible = bVisible;
 	Actor->ProcessEvent(Func, &Params);
+}
+
+void UInteractableIconSelectorComponent::SetIconVisibilityWithDistanceViaBPI(AActor* Actor, bool bVisible, float PlayerDistance) const
+{
+	if (!Actor)
+	{
+		return;
+	}
+
+	UFunction* Func = InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityWithDistanceFuncName);
+	if (!Func)
+	{
+		// Fallback to legacy signature.
+		SetIconVisibilityViaBPI(Actor, bVisible);
+		return;
+	}
+
+	// Always fill the parameter buffer via reflection so we don't depend on name/layout matching a local struct.
+	uint8* Buffer = (uint8*)FMemory_Alloca(Func->ParmsSize);
+	FMemory::Memzero(Buffer, Func->ParmsSize);
+
+	if (FProperty* VisibleProp = Func->FindPropertyByName(TEXT("Visible")))
+	{
+		if (FBoolProperty* BoolProp = CastField<FBoolProperty>(VisibleProp))
+		{
+			BoolProp->SetPropertyValue_InContainer(Buffer, bVisible);
+		}
+	}
+
+	if (FProperty* DistProp = Func->FindPropertyByName(TEXT("PlayerDistance")))
+	{
+		if (FFloatProperty* FloatProp = CastField<FFloatProperty>(DistProp))
+		{
+			FloatProp->SetPropertyValue_InContainer(Buffer, PlayerDistance);
+		}
+		else if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(DistProp))
+		{
+			DoubleProp->SetPropertyValue_InContainer(Buffer, (double)PlayerDistance);
+		}
+	}
+
+	Actor->ProcessEvent(Func, Buffer);
 }
 
 bool UInteractableIconSelectorComponent::GetIconWorldLocationViaBPI(AActor* Actor, FVector& OutLocation) const
@@ -701,28 +781,47 @@ void UInteractableIconSelectorComponent::SetIconVisibilityOnActor(AActor* Actor,
 	}
 }
 
-FVector UInteractableIconSelectorComponent::GetIconWorldLocationFromActor(AActor* Actor) const
+void UInteractableIconSelectorComponent::SetIconVisibilityOnActor(AActor* Actor, bool bVisible, float PlayerDistance) const
 {
 	if (!Actor)
 	{
-		return FVector::ZeroVector;
+		return;
 	}
+
+	// Only pass distance when being asked to show.
+	const float DistanceToPass = bVisible ? PlayerDistance : 0.0f;
 
 	if (bUseBPIInteractable)
 	{
-		FVector Loc;
-		if (GetIconWorldLocationViaBPI(Actor, Loc) && !Loc.IsNearlyZero())
+		if (bVisible)
 		{
-			return Loc;
+			SetIconVisibilityWithDistanceViaBPI(Actor, true, DistanceToPass);
 		}
-		return Actor->GetActorLocation();
+		else
+		{
+			SetIconVisibilityViaBPI(Actor, false);
+		}
+		return;
 	}
 
 	if (Actor->Implements<UInteractableIconInterface>())
 	{
-		const FVector Loc = IInteractableIconInterface::Execute_GetIconWorldLocation(Actor);
-		return Loc.IsNearlyZero() ? Actor->GetActorLocation() : Loc;
+		if (bVisible)
+		{
+			// Prefer V2 when implemented, fallback to legacy.
+			UFunction* Func = Actor->FindFunction(TEXT("SetIconVisibilityWithDistance"));
+			if (Func)
+			{
+				IInteractableIconInterface::Execute_SetIconVisibilityWithDistance(Actor, true, DistanceToPass);
+			}
+			else
+			{
+				IInteractableIconInterface::Execute_SetIconVisibility(Actor, true);
+			}
+		}
+		else
+		{
+			IInteractableIconInterface::Execute_SetIconVisibility(Actor, false);
+		}
 	}
-
-	return Actor->GetActorLocation();
 }
