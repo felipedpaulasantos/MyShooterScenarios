@@ -260,6 +260,33 @@ FVector UInteractableIconSelectorComponent::GetCandidateIconLocation(AActor* Can
 	return GetIconWorldLocationFromActor(Candidate);
 }
 
+FVector UInteractableIconSelectorComponent::GetIconWorldLocationFromActor(AActor* Actor) const
+{
+	if (!Actor)
+	{
+		return FVector::ZeroVector;
+	}
+
+	// If we're using a pure BPI-based integration, prefer the reflection wrapper.
+	if (bUseBPIInteractable)
+	{
+		FVector OutLoc = FVector::ZeroVector;
+		if (GetIconWorldLocationViaBPI(Actor, OutLoc))
+		{
+			return OutLoc;
+		}
+		// Fall through to a safe default if the BPI function isn't present.
+	}
+
+	// If actor implements our C++ interface (possibly via Blueprint), call it.
+	if (Actor->Implements<UInteractableIconInterface>())
+	{
+		return IInteractableIconInterface::Execute_GetIconWorldLocation(Actor);
+	}
+
+	return Actor->GetActorLocation();
+}
+
 bool UInteractableIconSelectorComponent::HasLineOfSightTo(AActor* Candidate, const FVector& ViewLocation, const FVector& TargetLocation) const
 {
 	UWorld* World = GetWorld();
