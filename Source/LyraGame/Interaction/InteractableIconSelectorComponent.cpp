@@ -18,6 +18,10 @@
 #include "CollisionQueryParams.h"
 #include "Kismet/KismetSystemLibrary.h"
 
+// UE_LOG formatting utilities in UE 5.7 rely on some std type-traits.
+#include "Templates/IsArithmetic.h" // ensures UE toolchain pulls in required type-traits
+#include "Templates/UnrealTemplate.h" // pull in UE's std type-traits bridges for log formatting (remove_reference_t)
+
 // Small reflection helpers to call Blueprint Interface functions without generated headers.
 namespace InteractableIconSelector::Private
 {
@@ -344,8 +348,11 @@ float UInteractableIconSelectorComponent::ScoreCandidate(AActor* Candidate, cons
 		return -1.0f;
 	}
 
-	const FVector Dir = ToTarget / Dist;
-	const float ForwardDot = FVector::DotProduct(ViewForward, Dir); // -1..1
+	// NOTE: In UE 5.7 FVector is typically double-precision (TVector<double>) and its operator/
+	// has constraints that can reject arithmetic types depending on toolchain settings.
+	// GetSafeNormal is the most robust/idiomatic way to normalize.
+	const FVector Dir = ToTarget.GetSafeNormal();
+	const float ForwardDot = (float)FVector::DotProduct(ViewForward, Dir); // -1..1
 	if (ForwardDot < MinForwardDotToConsider)
 	{
 		LastRejectReason = FString::Printf(TEXT("ForwardDotTooLow(%.3f<%.3f)"), ForwardDot, MinForwardDotToConsider);
@@ -364,7 +371,7 @@ float UInteractableIconSelectorComponent::ScoreCandidate(AActor* Candidate, cons
 		return -1.0f;
 	}
 
-	float PositionScore = 0.0f;
+	float PositionScore;
 
 	if (PositionScoreMode == EInteractableIconPositionScoreMode::PawnForward)
 	{
@@ -551,6 +558,15 @@ void UInteractableIconSelectorComponent::ScanAndApply()
 
 	ApplySelection(BestActor, ConsideredThisScan);
 
+	// If nothing is selected now, ensure we hide the previous best immediately.
+	if (!BestActor)
+	{
+		if (AActor* OldBest = CurrentBestActor.Get())
+		{
+			SetIconVisibilityOnActor(OldBest, false);
+		}
+	}
+
 	// Hide anything that was previously considered but no longer is.
 	for (const TWeakObjectPtr<AActor>& Prev : PreviouslyConsideredActors)
 	{
@@ -569,10 +585,11 @@ void UInteractableIconSelectorComponent::ScanAndApply()
 	PreviouslyConsideredActors.Reset(ConsideredThisScan.Num());
 	for (AActor* Considered : ConsideredThisScan)
 	{
-		PreviouslyConsideredActors.Add(Considered);
+		TWeakObjectPtr<AActor> Weak(static_cast<AActor*>(Considered));
+		PreviouslyConsideredActors.Add(Weak);
 	}
 
-	CurrentBestActor = BestActor;
+	CurrentBestActor = TWeakObjectPtr<AActor>(static_cast<AActor*>(BestActor));
 	CurrentBestScore = BestActor ? BestScore : -1.0f;
 }
 
@@ -601,7 +618,7 @@ void UInteractableIconSelectorComponent::ApplySelection(AActor* NewBestActor, co
 		}
 	}
 
-	// Also make sure the old best gets hidden if it left the overlap list.
+	// Always hide the old best if it differs from the new best (including when NewBestActor is null).
 	if (AActor* OldBest = CurrentBestActor.Get())
 	{
 		if (OldBest != NewBestActor)
@@ -613,11 +630,72 @@ void UInteractableIconSelectorComponent::ApplySelection(AActor* NewBestActor, co
 
 // ---- BPI reflection wrappers ----
 
+bool UInteractableIconSelectorComponent::GetIconWorldLocationViaBPI(AActor* Actor, FVector& OutLocation) const
+{
+	OutLocation = FVector::ZeroVector;
+	if (!Actor)
+	{
+		return false;
+	}
+
+	UFunction* Func = InteractableIconSelector::Private::FindFunc(Actor, BPI_GetIconWorldLocationFuncName);
+	if (!Func)
+	{
+		return false;
+	}
+
+	uint8* Buffer = (uint8*)FMemory_Alloca(Func->ParmsSize);
+	FMemory::Memzero(Buffer, Func->ParmsSize);
+
+	Actor->ProcessEvent(Func, Buffer);
+
+	// Read return value as FVector.
+	if (FProperty* ReturnProp = Func->GetReturnProperty())
+	{
+		if (FStructProperty* StructProp = CastField<FStructProperty>(ReturnProp))
+		{
+			if (StructProp->Struct == TBaseStructure<FVector>::Get())
+			{
+				void* ValuePtr = StructProp->ContainerPtrToValuePtr<void>(Buffer);
+				OutLocation = *reinterpret_cast<FVector*>(ValuePtr);
+				return true;
+			}
+		}
+	}
+
+	if (FProperty* ReturnByName = Func->FindPropertyByName(TEXT("ReturnValue")))
+	{
+		if (FStructProperty* StructProp = CastField<FStructProperty>(ReturnByName))
+		{
+			if (StructProp->Struct == TBaseStructure<FVector>::Get())
+			{
+				void* ValuePtr = StructProp->ContainerPtrToValuePtr<void>(Buffer);
+				OutLocation = *reinterpret_cast<FVector*>(ValuePtr);
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 bool UInteractableIconSelectorComponent::DoesActorImplementBPI(AActor* Actor) const
 {
-	return Actor && (
-		InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityFuncName) != nullptr ||
-		InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityWithDistanceFuncName) != nullptr);
+	if (!Actor)
+	{
+		return false;
+	}
+
+	// We consider it "implements" if it has at least the visibility function present.
+	// (Minimum distance / icon location are optional and will fallback.)
+	UFunction* Func = InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityFuncName);
+	if (Func)
+	{
+		return true;
+	}
+
+	// Fallback: some blueprints may only implement the "with distance" variant.
+	return InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityWithDistanceFuncName) != nullptr;
 }
 
 float UInteractableIconSelectorComponent::GetMinimumDistanceViaBPI(AActor* Actor) const
@@ -630,6 +708,7 @@ float UInteractableIconSelectorComponent::GetMinimumDistanceViaBPI(AActor* Actor
 	UFunction* Func = InteractableIconSelector::Private::FindFunc(Actor, BPI_GetMinimumDistanceFuncName);
 	if (!Func)
 	{
+		// Safe fallback.
 		return 0.0f;
 	}
 
@@ -638,30 +717,45 @@ float UInteractableIconSelectorComponent::GetMinimumDistanceViaBPI(AActor* Actor
 
 	Actor->ProcessEvent(Func, Buffer);
 
-	// Read return value via property to avoid relying on a locally-defined struct layout.
-	if (FProperty* ReturnProp = Func->GetReturnProperty())
+	// Read return value as float.
+	auto ReadFloatReturn = [&]() -> TOptional<float>
 	{
-		if (FFloatProperty* FloatProp = CastField<FFloatProperty>(ReturnProp))
+		if (FProperty* ReturnProp = Func->GetReturnProperty())
 		{
-			return FloatProp->GetPropertyValue_InContainer(Buffer);
-		}
-		if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(ReturnProp))
-		{
-			return (float)DoubleProp->GetPropertyValue_InContainer(Buffer);
-		}
-	}
+			if (FFloatProperty* FloatProp = CastField<FFloatProperty>(ReturnProp))
+			{
+				void* ValuePtr = FloatProp->ContainerPtrToValuePtr<void>(Buffer);
+				return *reinterpret_cast<float*>(ValuePtr);
+			}
 
-	// Fallback: try by name (older UFunction layouts)
-	if (FProperty* ReturnByName = Func->FindPropertyByName(TEXT("ReturnValue")))
+			if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(ReturnProp))
+			{
+				void* ValuePtr = DoubleProp->ContainerPtrToValuePtr<void>(Buffer);
+				return (float)(*reinterpret_cast<double*>(ValuePtr));
+			}
+		}
+
+		if (FProperty* ReturnByName = Func->FindPropertyByName(TEXT("ReturnValue")))
+		{
+			if (FFloatProperty* FloatProp = CastField<FFloatProperty>(ReturnByName))
+			{
+				void* ValuePtr = FloatProp->ContainerPtrToValuePtr<void>(Buffer);
+				return *reinterpret_cast<float*>(ValuePtr);
+			}
+
+			if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(ReturnByName))
+			{
+				void* ValuePtr = DoubleProp->ContainerPtrToValuePtr<void>(Buffer);
+				return (float)(*reinterpret_cast<double*>(ValuePtr));
+			}
+		}
+
+		return {};
+	};
+
+	if (const TOptional<float> Value = ReadFloatReturn(); Value.IsSet())
 	{
-		if (FFloatProperty* FloatProp = CastField<FFloatProperty>(ReturnByName))
-		{
-			return FloatProp->GetPropertyValue_InContainer(Buffer);
-		}
-		if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(ReturnByName))
-		{
-			return (float)DoubleProp->GetPropertyValue_InContainer(Buffer);
-		}
+		return FMath::Max(0.0f, Value.GetValue());
 	}
 
 	return 0.0f;
@@ -680,14 +774,41 @@ void UInteractableIconSelectorComponent::SetIconVisibilityViaBPI(AActor* Actor, 
 		return;
 	}
 
-	struct FParams
-	{
-		bool bVisible = false;
-	};
+	uint8* Buffer = (uint8*)FMemory_Alloca(Func->ParmsSize);
+	FMemory::Memzero(Buffer, Func->ParmsSize);
 
-	FParams Params;
-	Params.bVisible = bVisible;
-	Actor->ProcessEvent(Func, &Params);
+	// Best-effort: set first bool param named bVisible/Visible or any bool param if only one exists.
+	FBoolProperty* BoolProp = nullptr;
+	if (FProperty* Named = Func->FindPropertyByName(TEXT("bVisible")))
+	{
+		BoolProp = CastField<FBoolProperty>(Named);
+	}
+	if (!BoolProp)
+	{
+		if (FProperty* Named2 = Func->FindPropertyByName(TEXT("Visible")))
+		{
+			BoolProp = CastField<FBoolProperty>(Named2);
+		}
+	}
+	if (!BoolProp)
+	{
+		for (TFieldIterator<FProperty> It(Func); It && (It->PropertyFlags & CPF_Parm); ++It)
+		{
+			if (FBoolProperty* AsBool = CastField<FBoolProperty>(*It))
+			{
+				BoolProp = AsBool;
+				break;
+			}
+		}
+	}
+
+	if (BoolProp)
+	{
+		void* ValuePtr = BoolProp->ContainerPtrToValuePtr<void>(Buffer);
+		BoolProp->SetPropertyValue(ValuePtr, bVisible);
+	}
+
+	Actor->ProcessEvent(Func, Buffer);
 }
 
 void UInteractableIconSelectorComponent::SetIconVisibilityWithDistanceViaBPI(AActor* Actor, bool bVisible, float PlayerDistance) const
@@ -700,61 +821,131 @@ void UInteractableIconSelectorComponent::SetIconVisibilityWithDistanceViaBPI(AAc
 	UFunction* Func = InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityWithDistanceFuncName);
 	if (!Func)
 	{
-		// Fallback to legacy signature.
-		SetIconVisibilityViaBPI(Actor, bVisible);
 		return;
 	}
 
-	// Always fill the parameter buffer via reflection so we don't depend on name/layout matching a local struct.
 	uint8* Buffer = (uint8*)FMemory_Alloca(Func->ParmsSize);
 	FMemory::Memzero(Buffer, Func->ParmsSize);
 
-	if (FProperty* VisibleProp = Func->FindPropertyByName(TEXT("Visible")))
+	FBoolProperty* BoolProp = nullptr;
+	FFloatProperty* FloatProp = nullptr;
+
+	if (FProperty* Named = Func->FindPropertyByName(TEXT("bVisible")))
 	{
-		if (FBoolProperty* BoolProp = CastField<FBoolProperty>(VisibleProp))
+		BoolProp = CastField<FBoolProperty>(Named);
+	}
+	if (!BoolProp)
+	{
+		if (FProperty* Named2 = Func->FindPropertyByName(TEXT("Visible")))
 		{
-			BoolProp->SetPropertyValue_InContainer(Buffer, bVisible);
+			BoolProp = CastField<FBoolProperty>(Named2);
 		}
 	}
 
-	if (FProperty* DistProp = Func->FindPropertyByName(TEXT("PlayerDistance")))
+	if (FProperty* NamedDist = Func->FindPropertyByName(TEXT("PlayerDistance")))
 	{
-		if (FFloatProperty* FloatProp = CastField<FFloatProperty>(DistProp))
+		FloatProp = CastField<FFloatProperty>(NamedDist);
+	}
+	if (!FloatProp)
+	{
+		if (FProperty* NamedDist2 = Func->FindPropertyByName(TEXT("Distance")))
 		{
-			FloatProp->SetPropertyValue_InContainer(Buffer, PlayerDistance);
+			FloatProp = CastField<FFloatProperty>(NamedDist2);
 		}
-		else if (FDoubleProperty* DoubleProp = CastField<FDoubleProperty>(DistProp))
+	}
+
+	// Fallback by walking parms in order: look for first bool and first float.
+	for (TFieldIterator<FProperty> It(Func); It && (It->PropertyFlags & CPF_Parm); ++It)
+	{
+		if (!BoolProp)
 		{
-			DoubleProp->SetPropertyValue_InContainer(Buffer, (double)PlayerDistance);
+			BoolProp = CastField<FBoolProperty>(*It);
 		}
+		if (!FloatProp)
+		{
+			FloatProp = CastField<FFloatProperty>(*It);
+		}
+		if (BoolProp && FloatProp)
+		{
+			break;
+		}
+	}
+
+	if (BoolProp)
+	{
+		void* ValuePtr = BoolProp->ContainerPtrToValuePtr<void>(Buffer);
+		BoolProp->SetPropertyValue(ValuePtr, bVisible);
+	}
+	if (FloatProp)
+	{
+		void* ValuePtr = FloatProp->ContainerPtrToValuePtr<void>(Buffer);
+		*reinterpret_cast<float*>(ValuePtr) = PlayerDistance;
 	}
 
 	Actor->ProcessEvent(Func, Buffer);
 }
 
-bool UInteractableIconSelectorComponent::GetIconWorldLocationViaBPI(AActor* Actor, FVector& OutLocation) const
+void UInteractableIconSelectorComponent::SetIconVisibilityOnActor(AActor* Actor, bool bVisible) const
 {
-	OutLocation = FVector::ZeroVector;
 	if (!Actor)
 	{
-		return false;
+		return;
 	}
 
-	UFunction* Func = InteractableIconSelector::Private::FindFunc(Actor, BPI_GetIconWorldLocationFuncName);
-	if (!Func)
+	if (bUseBPIInteractable)
 	{
-		return false;
+		// Prefer the most specific signature if BP provides only the "with distance" version.
+		if (InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityFuncName))
+		{
+			SetIconVisibilityViaBPI(Actor, bVisible);
+			return;
+		}
+		if (InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityWithDistanceFuncName))
+		{
+			SetIconVisibilityWithDistanceViaBPI(Actor, bVisible, 0.0f);
+			return;
+		}
+		// Fall through to C++ interface fallback.
 	}
 
-	struct FParams
+	if (Actor->Implements<UInteractableIconInterface>())
 	{
-		FVector ReturnValue = FVector::ZeroVector;
-	};
+		IInteractableIconInterface::Execute_SetIconVisibility(Actor, bVisible);
+	}
+}
 
-	FParams Params;
-	Actor->ProcessEvent(Func, &Params);
-	OutLocation = Params.ReturnValue;
-	return true;
+void UInteractableIconSelectorComponent::SetIconVisibilityOnActor(AActor* Actor, bool bVisible, float PlayerDistance) const
+{
+	if (!Actor)
+	{
+		return;
+	}
+
+	if (bUseBPIInteractable)
+	{
+		if (InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityWithDistanceFuncName))
+		{
+			SetIconVisibilityWithDistanceViaBPI(Actor, bVisible, PlayerDistance);
+			return;
+		}
+		if (InteractableIconSelector::Private::FindFunc(Actor, BPI_SetIconVisibilityFuncName))
+		{
+			SetIconVisibilityViaBPI(Actor, bVisible);
+			return;
+		}
+		// Fall through to C++ interface fallback.
+	}
+
+	if (Actor->Implements<UInteractableIconInterface>())
+	{
+		// Prefer V2 API when implemented; BlueprintNativeEvent interface functions always exist,
+		// but Blueprint may not override it. Execute_ will still call the default implementation.
+		IInteractableIconInterface::Execute_SetIconVisibilityWithDistance(Actor, bVisible, PlayerDistance);
+	}
+	else
+	{
+		SetIconVisibilityOnActor(Actor, bVisible);
+	}
 }
 
 bool UInteractableIconSelectorComponent::IsInteractableActor(AActor* Actor) const
@@ -789,66 +980,3 @@ float UInteractableIconSelectorComponent::GetMinimumDistanceToShow(AActor* Actor
 		: 0.0f;
 }
 
-void UInteractableIconSelectorComponent::SetIconVisibilityOnActor(AActor* Actor, bool bVisible) const
-{
-	if (!Actor)
-	{
-		return;
-	}
-
-	if (bUseBPIInteractable)
-	{
-		SetIconVisibilityViaBPI(Actor, bVisible);
-		return;
-	}
-
-	if (Actor->Implements<UInteractableIconInterface>())
-	{
-		IInteractableIconInterface::Execute_SetIconVisibility(Actor, bVisible);
-	}
-}
-
-void UInteractableIconSelectorComponent::SetIconVisibilityOnActor(AActor* Actor, bool bVisible, float PlayerDistance) const
-{
-	if (!Actor)
-	{
-		return;
-	}
-
-	// Only pass distance when being asked to show.
-	const float DistanceToPass = bVisible ? PlayerDistance : 0.0f;
-
-	if (bUseBPIInteractable)
-	{
-		if (bVisible)
-		{
-			SetIconVisibilityWithDistanceViaBPI(Actor, true, DistanceToPass);
-		}
-		else
-		{
-			SetIconVisibilityViaBPI(Actor, false);
-		}
-		return;
-	}
-
-	if (Actor->Implements<UInteractableIconInterface>())
-	{
-		if (bVisible)
-		{
-			// Prefer V2 when implemented, fallback to legacy.
-			UFunction* Func = Actor->FindFunction(TEXT("SetIconVisibilityWithDistance"));
-			if (Func)
-			{
-				IInteractableIconInterface::Execute_SetIconVisibilityWithDistance(Actor, true, DistanceToPass);
-			}
-			else
-			{
-				IInteractableIconInterface::Execute_SetIconVisibility(Actor, true);
-			}
-		}
-		else
-		{
-			IInteractableIconInterface::Execute_SetIconVisibility(Actor, false);
-		}
-	}
-}

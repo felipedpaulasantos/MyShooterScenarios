@@ -19,6 +19,14 @@ public class LyraEditorTarget : TargetRules
 
 		LyraGameTarget.ApplySharedLyraTargetSettings(this);
 
+		// Live Coding builds can be very PCH-heavy and hit MSVC heap/pagefile limits.
+		// Disabling unity builds tends to reduce peak PCH pressure for iterative compiles.
+		bUseUnityBuild = false;
+		bUseAdaptiveUnityBuild = false;
+
+		// Avoid distributed build executors during Live Coding (helps stability when memory is tight).
+		// (Not all target rule flags exist in all UE versions; leave executor selection to UBT defaults.)
+
 		// This is used for touch screen development along with the "Unreal Remote 2" app
 		EnablePlugins.Add("RemoteSession");
 	}
