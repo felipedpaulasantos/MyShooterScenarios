@@ -91,36 +91,39 @@ private:
 	// NOTE: Avoid storing FOverlapResult as a member to prevent incomplete-type issues in certain build configurations.
 	mutable TArray<TWeakObjectPtr<AActor>> CandidatesScratch;
 
-	/** If true, calls functions on the Blueprint Interface BPI_Interactable via reflection (no generated header required). */
+	/** If true, requires the actor to implement the Blueprint Interface BPI_Interactable (checked via reflection). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
-		bool bUseBPIInteractable = true;
+		bool bRequireBPIInteractable = true;
+
+	/** Name of the BPI_Interactable function used as a presence check (any function on the interface works). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
+		FName BPI_InteractablePresenceFuncName = TEXT("GetMinimumDistanceToShowIcon");
 
 	/** Name of the BPI function that returns the minimum distance (float) to show the icon. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
 		FName BPI_GetMinimumDistanceFuncName = TEXT("GetMinimumDistanceToShowIcon");
 
-	/** Name of the BPI function that sets icon visibility (bool param). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
-		FName BPI_SetIconVisibilityFuncName = TEXT("SetIconVisibility");
-
-	/** Name of the BPI function that sets icon visibility + player distance (bool + float params). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
-		FName BPI_SetIconVisibilityWithDistanceFuncName = TEXT("SetIconVisibilityWithDistance");
-
 	/** Optional: name of the BPI function that returns the icon world location (FVector). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
 		FName BPI_GetIconWorldLocationFuncName = TEXT("GetIconWorldLocation");
 
+	/** Interactable component class to look for on candidates (BPAC_Interactable). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Component", meta = (AllowPrivateAccess = "true"))
+		TSoftClassPtr<UActorComponent> InteractableComponentClass;
+
+	/** If true and InteractableComponentClass isn't set/loaded, accept any actor that has a component with SetWidgetVisibility(bool,float). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Component", meta = (AllowPrivateAccess = "true"))
+		bool bAllowAnyComponentWithSetWidgetVisibility = true;
+
 	bool DoesActorImplementBPI(AActor* Actor) const;
 	float GetMinimumDistanceViaBPI(AActor* Actor) const;
-	void SetIconVisibilityViaBPI(AActor* Actor, bool bVisible) const;
-	void SetIconVisibilityWithDistanceViaBPI(AActor* Actor, bool bVisible, float PlayerDistance) const;
 	bool GetIconWorldLocationViaBPI(AActor* Actor, FVector& OutLocation) const;
+
+	UActorComponent* FindInteractableComponent(AActor* Actor) const;
+	void SetWidgetVisibilityOnActor(AActor* Actor, bool bVisible, float PlayerDistance) const;
 
 	bool IsInteractableActor(AActor* Actor) const;
 	float GetMinimumDistanceToShow(AActor* Actor) const;
-	void SetIconVisibilityOnActor(AActor* Actor, bool bVisible) const;
-	void SetIconVisibilityOnActor(AActor* Actor, bool bVisible, float PlayerDistance) const;
 	FVector GetIconWorldLocationFromActor(AActor* Actor) const;
 
 	/** Actors that were considered in the previous scan. Used to hide icons when they drop out of range/filters. */
