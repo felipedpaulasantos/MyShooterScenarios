@@ -71,14 +71,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Visibility", meta = (AllowPrivateAccess = "true"))
 		TEnumAsByte<ECollisionChannel> LineOfSightTraceChannel = ECC_Visibility;
 // --- Scoring Weights ---
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Scoring", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-		float WeightCenter = 0.7f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Scoring", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-		float WeightForward = 0.3f;
-/** Extra multiplier if visible (only applied when bRequireLineOfSight==false). */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|Scoring", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
-		float VisibleScoreMultiplier = 1.25f;
-/** Helps reduce flicker: only switch if new score > old score + delta. */
+	// (Removed unused scoring weight variables; score calculation is currently fixed.)
+
+	/** Helps reduce flicker: only switch if new score > old score + delta. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|UX", meta = (AllowPrivateAccess = "true", ClampMin = "0.0"))
 		float MinSwitchScoreDelta = 0.05f;
 // --- State ---
@@ -89,9 +84,8 @@ private:
 	float CurrentBestScore = -1.0f;
 // Reused arrays to avoid allocations.
 	// NOTE: Avoid storing FOverlapResult as a member to prevent incomplete-type issues in certain build configurations.
-	mutable TArray<TWeakObjectPtr<AActor>> CandidatesScratch;
 
-	/** If true, requires the actor to implement the Blueprint Interface BPI_Interactable (checked via reflection). */
+	// --- BPI / Component integration ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction|Icon|BPI", meta = (AllowPrivateAccess = "true"))
 		bool bRequireBPIInteractable = true;
 
