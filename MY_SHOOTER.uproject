@@ -291,7 +291,7 @@
 		},
 		{
 			"Name": "RMFixTool",
-			"Enabled": true
+			"Enabled": false
 		},
 		{
 			"Name": "FreeBoneSnapper",
