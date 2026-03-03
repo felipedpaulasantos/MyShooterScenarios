@@ -8,8 +8,11 @@
 
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Actor.h"
+#include "Logging/LogMacros.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraBlockHealthLogicComponent)
+
+DEFINE_LOG_CATEGORY_STATIC(LogLyraBlockHealthLogic, Log, All);
 
 ULyraBlockHealthLogicComponent::ULyraBlockHealthLogicComponent(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -84,6 +87,7 @@ void ULyraBlockHealthLogicComponent::TryBindToHealthComponent()
 	AActor* Owner = GetOwner();
 	if (!Owner)
 	{
+		UE_LOG(LogLyraBlockHealthLogic, Verbose, TEXT("TryBindToHealthComponent: No owner"));
 		return;
 	}
 
@@ -96,6 +100,10 @@ void ULyraBlockHealthLogicComponent::TryBindToHealthComponent()
 		// Initial broadcast for UI.
 		const int32 Blocks = GetCurrentBlocks_Implementation();
 		OnBlocksChanged.Broadcast(this, Blocks, Blocks, nullptr);
+	}
+	else
+	{
+		UE_LOG(LogLyraBlockHealthLogic, Verbose, TEXT("TryBindToHealthComponent: '%s' has no ULyraHealthComponent (blocks will read as 0)"), *GetNameSafe(Owner));
 	}
 }
 
@@ -138,11 +146,23 @@ float ULyraBlockHealthLogicComponent::BlocksToHealth(int32 Blocks) const
 
 int32 ULyraBlockHealthLogicComponent::GetCurrentBlocks_Implementation() const
 {
+	// Lazily bind in case component init order meant BeginPlay couldn't find the health component yet.
+	if (!HealthComponent)
+	{
+		const_cast<ULyraBlockHealthLogicComponent*>(this)->TryBindToHealthComponent();
+	}
+
 	return HealthComponent ? HealthToBlocks_RoundUp(HealthComponent->GetHealth()) : 0;
 }
 
 int32 ULyraBlockHealthLogicComponent::GetMaxBlocks_Implementation() const
 {
+	// Lazily bind in case component init order meant BeginPlay couldn't find the health component yet.
+	if (!HealthComponent)
+	{
+		const_cast<ULyraBlockHealthLogicComponent*>(this)->TryBindToHealthComponent();
+	}
+
 	return HealthComponent ? HealthToBlocks_RoundUp(HealthComponent->GetMaxHealth()) : 0;
 }
 
@@ -240,7 +260,7 @@ void ULyraBlockHealthLogicComponent::ApplyQuantizedHealthIfNeeded(float OldHealt
 		return;
 	}
 
-	float QuantizedTargetHealth = ClampedNew;
+	float QuantizedTargetHealth;
 
 	if (bIsDamage)
 	{
@@ -272,4 +292,3 @@ void ULyraBlockHealthLogicComponent::ApplyQuantizedHealthIfNeeded(float OldHealt
 	ASC->SetNumericAttributeBase(ULyraHealthSet::GetHealthAttribute(), QuantizedTargetHealth);
 	bApplyingQuantization = false;
 }
-
