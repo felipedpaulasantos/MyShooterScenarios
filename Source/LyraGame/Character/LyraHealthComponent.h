@@ -131,4 +131,8 @@ protected:
 	// Replicated state used to handle dying.
 	UPROPERTY(ReplicatedUsing = OnRep_DeathState)
 	ELyraDeathState DeathState;
+
+	// Prevent re-entrant death forcing when health hits 0 through non-standard paths.
+	UPROPERTY(Transient)
+	bool bForcingDeathFlow = false;
 };

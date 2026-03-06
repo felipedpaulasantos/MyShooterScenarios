@@ -288,6 +288,22 @@ void ULyraBlockHealthLogicComponent::ApplyQuantizedHealthIfNeeded(float OldHealt
 		return;
 	}
 
+	// IMPORTANT: Lyra death flow is triggered by ULyraHealthSet::OnOutOfHealth, which is broadcast
+	// from ULyraHealthSet::PostGameplayEffectExecute (i.e. when damage/heal meta attributes are applied).
+	// Directly overriding Health via SetNumericAttributeBase can bypass that flow, leaving the pawn "alive"
+	// even if Health visually hits 0.
+	//
+	// So, when our quantization would drive health to 0, route it through the standard self-destruct damage GE.
+	if (QuantizedTargetHealth <= 0.0f)
+	{
+		// Avoid loops: DamageSelfDestruct applies damage, which will re-enter health change delegates.
+		bApplyingQuantization = true;
+		UE_LOG(LogLyraBlockHealthLogic, Verbose, TEXT("ApplyQuantizedHealthIfNeeded: quantized to 0 -> triggering Lyra death flow via DamageSelfDestruct for '%s'"), *GetNameSafe(Owner));
+		HealthComponent->DamageSelfDestruct(/*bFellOutOfWorld=*/ false);
+		bApplyingQuantization = false;
+		return;
+	}
+
 	bApplyingQuantization = true;
 	ASC->SetNumericAttributeBase(ULyraHealthSet::GetHealthAttribute(), QuantizedTargetHealth);
 	bApplyingQuantization = false;

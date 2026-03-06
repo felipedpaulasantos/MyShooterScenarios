@@ -2,7 +2,6 @@
 
 #include "Character/LyraHealthComponent.h"
 
-#include "AbilitySystem/Attributes/LyraAttributeSet.h"
 #include "LyraLogChannels.h"
 #include "System/LyraAssetManager.h"
 #include "System/LyraGameData.h"
@@ -149,6 +148,30 @@ static AActor* GetInstigatorFromAttrChangeData(const FOnAttributeChangeData& Cha
 void ULyraHealthComponent::HandleHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	OnHealthChanged.Broadcast(this, ChangeData.OldValue, ChangeData.NewValue, GetInstigatorFromAttrChangeData(ChangeData));
+
+#if WITH_SERVER_CODE
+	// Failsafe: some systems may override Health directly (e.g. SetNumericAttributeBase) which can bypass
+	// ULyraHealthSet::PostGameplayEffectExecute and therefore never broadcast OnOutOfHealth / GameplayEvent.Death.
+	// If we detect we reached 0 health but aren't dying yet, force the death flow once.
+	if (AbilitySystemComponent)
+	{
+		AActor* Owner = GetOwner();
+		if (Owner && Owner->HasAuthority() && !bForcingDeathFlow && (DeathState == ELyraDeathState::NotDead) && (ChangeData.NewValue <= 0.0f))
+		{
+			bForcingDeathFlow = true;
+
+			UE_LOG(LogLyra, Warning, TEXT("LyraHealthComponent: Health reached 0 without OutOfHealth. Forcing death flow for owner [%s]."), *GetNameSafe(Owner));
+
+			// Backup: start death immediately so the pawn becomes dying even if the death ability can't trigger.
+			StartDeath();
+
+			// Preferred: route through the standard damage GE path so GameplayEvent.Death / death ability fires.
+			DamageSelfDestruct(/*bFellOutOfWorld=*/ false);
+
+			bForcingDeathFlow = false;
+		}
+	}
+#endif // WITH_SERVER_CODE
 }
 
 void ULyraHealthComponent::HandleMaxHealthChanged(const FOnAttributeChangeData& ChangeData)
@@ -320,4 +343,3 @@ void ULyraHealthComponent::DamageSelfDestruct(bool bFellOutOfWorld)
 		AbilitySystemComponent->ApplyGameplayEffectSpecToSelf(*Spec);
 	}
 }
-
