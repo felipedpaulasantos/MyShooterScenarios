@@ -286,7 +286,7 @@
 		},
 		{
 			"Name": "RootMotionGuidePlugin",
-			"Enabled": true,
+			"Enabled": false,
 			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/content/e3aab86c458c4b4999d6b80249f33a6d"
 		},
 		{
