@@ -30,6 +30,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "PCG",
+			"Enabled": true
+		},
+		{
 			"Name": "ModularGameplay",
 			"Enabled": true
 		},

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fathom": {
+      "type": "http",
+      "url": "http://localhost:19876/mcp"
+    }
+  }
+}

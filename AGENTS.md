@@ -27,16 +27,25 @@
 - **GameplayAbilities + GameplayCues** are central:
   - `Config/DefaultGame.ini` sets `AbilitySystemGlobalsClassName=/Script/LyraGame.LyraAbilitySystemGlobals` and `GlobalGameplayCueManagerClass=/Script/LyraGame.LyraGameplayCueManager`.
   - `LyraGameFeaturePolicy` observes GameFeature load/unload and adds cue notify paths from `UGameFeatureAction_AddGameplayCuePath` actions (see `LyraGameFeaturePolicy.cpp`).
-- **Online services are enabled but default to Null in config**:
+- **Offline single-player by default**:
   - `Config/DefaultEngine.ini` → `[OnlineServices] DefaultServices=Null`
-  - `MY_SHOOTER.uproject` enables EOS/Steam/OSS adapter plugins; don’t assume a real backend is active in local runs.
+  - `MY_SHOOTER.uproject` has multiplayer/online backend plugins disabled (EOS/Steam/OSS adapter, SteamSockets) to keep the build lean.
+  - To re-enable online play/services later: flip those plugins back on in `MY_SHOOTER.uproject` and change `[OnlineServices] DefaultServices=...` (plus any subsystem-specific config).
 - **Networking uses Iris** (UE5 replication system):
   - `Config/DefaultEngine.ini` sets `bEnableIris=true` and includes multiple Iris configs under `/Script/Engine.Engine`.
+  - ReplicationGraph is intentionally disabled for this project (`Config/DefaultGame.ini` → `[/Script/LyraGame.LyraReplicationGraphSettings] bDisableReplicationGraph=True`) and the `ReplicationGraph` plugin is disabled in `MY_SHOOTER.uproject`.
 
 ## Build / regenerate project files (Windows)
 - Canonical entry: open `MY_SHOOTER.uproject` in Unreal Editor.
 - If you need to regenerate IDE files, use Unreal’s “Generate Visual Studio project files” on the `.uproject`.
 - Solution file exists: `MY_SHOOTER.sln` (but `.uproject` drives UBT/UPROJECT settings).
+
+## Log triage (PowerShell)
+- Crash logs can be huge; prefer tailing/searching instead of opening full files.
+- Tail recent crash logs (Saved/Crashes/*/MY_SHOOTER.log):
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CustomScripts/tail_my_shooter_logs.ps1 -TailLines 200 -MaxCrashes 3`
+- Tail the *live* editor log (Saved/Logs/MY_SHOOTER.log) while the editor is running:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File CustomScripts/tail_my_shooter_live_log.ps1 -TailLines 200`
 
 ## Working with content + maps
 - Default packaged front-end content is in `/Game/System/FrontEnd/...` and staged via `MapsToCook` in `Config/DefaultGame.ini`.
