@@ -5,6 +5,15 @@
 - Main code modules: `Source/LyraGame` (runtime) and `Source/LyraEditor` (editor).
 - Uses Lyra’s **GameFeature** architecture heavily (`Plugins/GameFeatures/*`).
 
+This file is the repo playbook (where systems live, how the project boots, and common workflows). For a quick “how do I open/run this project?” entrypoint, see `README.md`.
+
+## Authoritative sources (check these first)
+When behavior differs from expectation, verify the configuration and plugin metadata before changing code:
+- `Config/DefaultEngine.ini` (engine classes, maps)
+- `Config/DefaultGame.ini` (Lyra systems, GameFeature policy)
+- `MY_SHOOTER.uproject` (engine/plugins enabled for the project)
+- Feature plugin `.uplugin` files (e.g. `Plugins/GameFeatures/MyShooterFeaturePlugin/MyShooterFeaturePlugin.uplugin`)
+
 ## How the game boots (where to look)
 - Defaults are config-driven:
   - Engine classes: `Config/DefaultEngine.ini` → `GameEngine=/Script/LyraGame.LyraGameEngine`, `AssetManagerClassName=/Script/LyraGame.LyraAssetManager`.
@@ -22,6 +31,11 @@
   - Other feature plugins: `ShooterCore`, `ShooterMaps`, `TopDownArena`, `ShooterTests`.
 - Keep core/shared systems in `Source/LyraGame` (input/UI/ability system foundations).
 
+### Practical rule of thumb
+- **New weapon / ability / enemy / map slice** that can be enabled/disabled → add it to a **GameFeature** plugin.
+- **Cross-cutting foundation** used by multiple features (UI framework, GAS glue, save system) → keep in `Source/LyraGame`.
+- **Editor-only tooling** → `Source/LyraEditor`.
+
 ## Key patterns/conventions in this repo
 - **Config is authoritative** for core class selection and boot flow (`DefaultEngine.ini`, `DefaultGame.ini`). When behavior “mysteriously” differs, check config before code.
 - **GameplayAbilities + GameplayCues** are central:
@@ -33,7 +47,8 @@
   - To re-enable online play/services later: flip those plugins back on in `MY_SHOOTER.uproject` and change `[OnlineServices] DefaultServices=...` (plus any subsystem-specific config).
 - **Networking uses Iris** (UE5 replication system):
   - `Config/DefaultEngine.ini` sets `bEnableIris=true` and includes multiple Iris configs under `/Script/Engine.Engine`.
-  - ReplicationGraph is intentionally disabled for this project (`Config/DefaultGame.ini` → `[/Script/LyraGame.LyraReplicationGraphSettings] bDisableReplicationGraph=True`) and the `ReplicationGraph` plugin is disabled in `MY_SHOOTER.uproject`.
+  - ReplicationGraph usage is currently disabled via config (`Config/DefaultGame.ini` → `[/Script/LyraGame.LyraReplicationGraphSettings] bDisableReplicationGraph=True`).
+    - Note: the `ReplicationGraph` plugin itself is **enabled** in `MY_SHOOTER.uproject`. Treat this as “available, but turned off by settings” unless you intentionally re-enable it.
 
 ## Build / regenerate project files (Windows)
 - Canonical entry: open `MY_SHOOTER.uproject` in Unreal Editor.
@@ -57,6 +72,35 @@
 - GameFeature plugins (gameplay slices): `Plugins/GameFeatures/`
 - Project-wide configuration: `Config/*.ini`
 - Automation/maintenance scripts: `CustomScripts/` and `clean-unreal.ps1`
+
+## Common workflows
+
+### Add a new GameFeature plugin (gameplay slice)
+Prefer creating a new plugin under `Plugins/GameFeatures/` when the feature is meant to be toggleable.
+
+Checklist:
+1. Create the plugin (Editor: **Plugins** window → **New Plugin** → **Game Feature (Content Only)** or **Game Feature (C++)**).
+2. Ensure the plugin’s `.uplugin` metadata matches intent:
+   - `BuiltInInitialFeatureState` (e.g. `Active` for always-on in this project)
+   - `ExplicitlyLoaded` (affects whether it auto-registers)
+3. Add dependencies (e.g. `ShooterCore`) if required.
+
+### Add GameplayCues in a feature
+If a feature adds cue notifies, it must also register a cue path so Lyra can discover them dynamically when the feature loads.
+
+Checklist:
+- Add a `UGameFeatureAction_AddGameplayCuePath` to the feature’s Game Feature Data.
+- Verify the cue notify asset path is inside the registered directory.
+- Confirm `LyraGameFeaturePolicy` logs cue-path registration when activating the feature.
+
+### Add maps provided by a feature
+- Put maps under the feature plugin’s `Content/Maps/` (or an equivalent folder).
+- If the map should be cooked/packaged, ensure it’s included via project settings / `MapsToCook` (project-specific; check `Config/DefaultGame.ini`).
+
+## Debugging quick hits
+- Live log: `Saved/Logs/MY_SHOOTER.log`
+- Crash logs: `Saved/Crashes/*/MY_SHOOTER.log`
+- Prefer tail scripts in `CustomScripts/` to avoid opening huge logs.
 
 ## When changing/adding a GameFeature
 - Update the feature’s `.uplugin` metadata/state (e.g. `BuiltInInitialFeatureState`) and keep `ExplicitlyLoaded` behavior in mind.
