@@ -28,7 +28,7 @@ public class MyShooterFeaturePluginRuntime : ModuleRules
 			new string[]
 			{
 				"Core",
-				// ... add other public dependencies that you statically link with here ...
+				"GameplayTags",   // FGameplayTag in MusicManagerSubsystem public API
 			}
 		);
 

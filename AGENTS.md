@@ -3,9 +3,9 @@
 ## Project snapshot
 - Unreal Engine **5.7** project (`MY_SHOOTER.uproject`) based on **Lyra Starter Game**.
 - Main code modules: `Source/LyraGame` (runtime) and `Source/LyraEditor` (editor).
-- Uses Lyra’s **GameFeature** architecture heavily (`Plugins/GameFeatures/*`).
+- Uses Lyra's **GameFeature** architecture heavily (`Plugins/GameFeatures/*`).
 
-This file is the repo playbook (where systems live, how the project boots, and common workflows). For a quick “how do I open/run this project?” entrypoint, see `README.md`.
+This file is the repo playbook (where systems live, how the project boots, and common workflows). For a quick "how do I open/run this project?" entrypoint, see `README.md`.
 
 ## Authoritative sources (check these first)
 When behavior differs from expectation, verify the configuration and plugin metadata before changing code:
@@ -25,7 +25,7 @@ When behavior differs from expectation, verify the configuration and plugin meta
 - GameFeature policy wires feature loading & runtime cue discovery:
   - `Source/LyraGame/GameFeatures/LyraGameFeaturePolicy.{h,cpp}` (registered in `Config/DefaultGame.ini` via `GameFeaturesManagerClassName=/Script/LyraGame.LyraGameFeaturePolicy`).
 
-## “Where should new gameplay code/content go?”
+## "Where should new gameplay code/content go?"
 - Prefer **GameFeature plugins** for shippable, toggleable gameplay slices:
   - Example: `Plugins/GameFeatures/MyShooterFeaturePlugin` (enabled by default, `BuiltInInitialFeatureState": "Active"`, depends on `ShooterCore`).
   - Other feature plugins: `ShooterCore`, `ShooterMaps`, `TopDownArena`, `ShooterTests`.
@@ -73,6 +73,123 @@ When behavior differs from expectation, verify the configuration and plugin meta
 - Project-wide configuration: `Config/*.ini`
 - Automation/maintenance scripts: `CustomScripts/` and `clean-unreal.ps1`
 
+---
+
+## Source/LyraGame subsystem map
+
+All folders under `Source/LyraGame/` and what they own:
+
+| Folder | Owns |
+|---|---|
+| `AbilitySystem/` | GAS foundation: `ULyraAbilitySystemComponent`, attribute sets, ability base classes, async actions, global ability system |
+| `AI/` | AI controller base, perception/sensing helpers |
+| `Animation/` | Anim instances, anim notify states, linked anim layers |
+| `Audio/` | Audio settings, mix modifiers, Lyra audio component |
+| `Camera/` | `ULyraCameraComponent`, camera modes, spring-arm overrides |
+| `Character/` | `ALyraCharacter`, `ULyraPawnExtensionComponent`, `ULyraHealthComponent`, `ULyraPawnData` |
+| `Cosmetics/` | Character part / cosmetic system (swappable meshes) |
+| `Development/` | Cheat manager, dev settings, debug helpers |
+| `Equipment/` | `ULyraEquipmentManagerComponent`, equipment definition/instance |
+| `Feedback/` | Number pop, screen effects, rumble |
+| `GameFeatures/` | `LyraGameFeaturePolicy`, GameFeature action implementations |
+| `GameModes/` | `ALyraGameMode`, `ALyraGameState`, `ULyraExperienceManagerComponent`, `ULyraExperienceDefinition` |
+| `Hotfix/` | Runtime hotfix manager |
+| `Input/` | `ULyraInputComponent`, `ULyraInputConfig`, input modifier classes |
+| `Interaction/` | Interaction system (interact ability, `ULyraInteractableComponent`) |
+| `Inventory/` | Item definition, inventory manager component |
+| `Messages/` | Gameplay message structs broadcast via `GameplayMessageRouter` |
+| `Performance/` | Performance settings, machine-quality snapshot |
+| `Physics/` | Physical material overrides, trace channels helpers |
+| `Player/` | `ALyraPlayerController`, `ALyraPlayerState`, `ALyraLocalPlayer` |
+| `Replays/` | Replay subsystem, async actions for replay playback |
+| `Settings/` | `ULyraSettingsLocal`, `ULyraSettingsShared`, screen/input settings |
+| `System/` | `ULyraAssetManager`, `ULyraGameInstance`, `ULyraGameData`, lifecycle helpers |
+| `Teams/` | Team subsystem, team info actor, team display assets |
+| `Tests/` | Gauntlet test base classes |
+| `UI/` | HUD layout (`ULyraHUDLayout`), indicator system, CommonUI widget base |
+| `Weapons/` | `ULyraWeaponStateComponent`, ranged weapon instance, spread helpers |
+
+**Build file:** `Source/LyraGame/LyraGame.Build.cs`
+- Add engine/plugin module dependencies to `PublicDependencyModuleNames` or `PrivateDependencyModuleNames`.
+- Key modules already present: `GameplayAbilities`, `GameplayTags`, `EnhancedInput`, `CommonUI`, `CommonGame`, `Niagara`, `AIModule`, `ModularGameplay`, `GameFeatures`, `ReplicationGraph`.
+- For inter-plugin C++ deps (e.g. calling into `ShooterCoreRuntime` from `LyraGame`), add to `PrivateDependencyModuleNames` and include the plugin's public header path.
+
+---
+
+## Lyra Experience system
+
+Experiences are the primary composition mechanism — they describe a full gameplay mode as a data asset.
+
+- **`ULyraExperienceDefinition`** (`Source/LyraGame/GameModes/`) — the root asset. References:
+  - `DefaultPawnData` (`ULyraPawnData`) — which character class and ability set to spawn with.
+  - `ActionSets` (`ULyraExperienceActionSet`) — reusable bundles of `UGameFeatureAction`s (grant abilities, add components, inject HUD widgets, etc.).
+  - `Actions` — inline `UGameFeatureAction` list (same types as action sets, but specific to this experience).
+- **`ULyraExperienceActionSet`** — a reusable list of `UGameFeatureAction`s shared across multiple experiences (e.g. a "core shooter HUD" set used by several maps).
+- **How features plug in:** a GameFeature plugin does **not** modify the Experience asset directly. Instead it provides its own Experience (or action set) and the map's `ALyraWorldSettings` selects which Experience to load via `DefaultGameplayExperience`.
+- **Where Experiences live in this project:** `Plugins/GameFeatures/MyShooterFeaturePlugin/Content/Experience/`
+
+### Typical new-mode checklist
+1. Create a `ULyraExperienceDefinition` data asset in your feature plugin's `Content/Experience/`.
+2. Assign `DefaultPawnData` (or inherit from a ShooterCore pawn data).
+3. Add `UGameFeatureAction_AddAbilities`, `UGameFeatureAction_AddComponents`, `UGameFeatureAction_AddWidgets` actions / action sets as needed.
+4. Set `DefaultGameplayExperience` on the map's `ALyraWorldSettings` (or `B_LyraWorldSettings`) to point to your new asset.
+
+---
+
+## GameFeature plugin inventory
+
+All plugins under `Plugins/GameFeatures/`:
+
+| Plugin | State | Description |
+|---|---|---|
+| `MyShooterFeaturePlugin` | **Active** (always on) | Primary project plugin. Custom weapons, abilities, maps, and the main `Experience` asset for this project. Depends on `ShooterCore`. C++ module: `MyShooterFeaturePluginRuntime`. |
+| `ShooterCore` | Registered (not auto-active) | Lyra's shared shooter systems: weapon framework, damage/health abilities, input configs, base pawn data. Required dependency for most other shooter plugins. C++ module: `ShooterCoreRuntime`. |
+| `ShooterMaps` | Registered | Stock Lyra shooter maps (Expanse, Convolution, etc.). Content-only; no C++ module. Depends on `ShooterCore`. |
+| `ShooterExplorer` | Registered | Extends `ShooterCore` with adventure/exploration elements. Content-only. Depends on `ShooterCore` + `LyraExampleContent`. |
+| `ShooterTests` | Registered | Gauntlet/automation tests for shooter gameplay. C++ module: `ShooterTestsRuntime`. Depends on `ShooterCore`. |
+| `TopDownArena` | Registered | Separate top-down arena game mode (Game2). C++ module: `TopDownArenaRuntime`. Uses Niagara. |
+| `Meshy-ue-plugin` | Explicitly loaded | **Editor-only** Meshy AI 3-D asset bridge (Win64/Mac). No gameplay content; C++ module: `meshy`. Not a Game Feature — ignore for gameplay work. |
+
+> **"Registered" vs "Active":** `Registered` means the plugin is known to the GameFeature subsystem but its actions are **not** applied until something activates it (e.g. loading an Experience that references it). `Active` means actions are applied at startup.
+
+---
+
+## Asset naming conventions
+
+Follow Lyra/UE community prefixes consistently so AI agents and humans can infer asset type from name:
+
+| Prefix | Asset type |
+|---|---|
+| `B_` | Blueprint class (Actor, Component, etc.) |
+| `W_` | Widget Blueprint (UMG) |
+| `MAP_` | Level / Map |
+| `GA_` | Gameplay Ability (`UGameplayAbility`) |
+| `GE_` | Gameplay Effect (`UGameplayEffect`) |
+| `GC_` | Gameplay Cue Notify |
+| `GAS_` or `AS_` | Gameplay Ability Set |
+| `GT_` | Gameplay Tag table |
+| `ID_` | Input Action (`UInputAction`) |
+| `IMC_` | Input Mapping Context (`UInputMappingContext`) |
+| `EQS_` | Environment Query |
+| `BT_` | Behaviour Tree |
+| `BB_` | Blackboard |
+| `DT_` | Data Table |
+| `DA_` | Data Asset (generic) |
+| `T_` | Texture |
+| `M_` | Material |
+| `MI_` | Material Instance |
+| `MF_` | Material Function |
+| `SM_` | Static Mesh |
+| `SK_` | Skeletal Mesh |
+| `ABP_` | Animation Blueprint |
+| `AM_` | Animation Montage |
+| `NS_` | Niagara System |
+| `NE_` | Niagara Emitter |
+| `S_` | Sound Wave |
+| `SC_` | Sound Cue |
+
+---
+
 ## Common workflows
 
 ### Add a new GameFeature plugin (gameplay slice)
@@ -107,7 +224,8 @@ Checklist:
 - If the feature introduces GameplayCues, add a `GameFeatureAction_AddGameplayCuePath` so cues are dynamically discovered when the plugin is registered (the policy observes this).
 
 ## References
-- Lyra overview (high level): `Source/LyraGame/README.md`
 - GameFeature policy implementation (project-specific wiring): `Source/LyraGame/GameFeatures/LyraGameFeaturePolicy.{h,cpp}`
+- Experience system classes: `Source/LyraGame/GameModes/LyraExperienceDefinition.{h,cpp}`, `LyraExperienceActionSet.{h,cpp}`, `LyraExperienceManagerComponent.{h,cpp}`
+- Module build rules: `Source/LyraGame/LyraGame.Build.cs`
 - Config-driven boot settings: `Config/DefaultEngine.ini`, `Config/DefaultGame.ini`
 
