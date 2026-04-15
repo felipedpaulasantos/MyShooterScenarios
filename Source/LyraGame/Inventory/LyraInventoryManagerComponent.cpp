@@ -158,8 +158,11 @@ void ULyraInventoryManagerComponent::GetLifetimeReplicatedProps(TArray< FLifetim
 
 bool ULyraInventoryManagerComponent::CanAddItemDefinition(TSubclassOf<ULyraInventoryItemDefinition> ItemDef, int32 StackCount)
 {
-	//@TODO: Add support for stack limit / uniqueness checks / etc...
-	return true;
+	// Default: always allowed.  External components (e.g. a capacity manager) can
+	// bind to OnCanAddItem and set bCanAdd = false to veto the addition.
+	bool bCanAdd = true;
+	OnCanAddItem.Broadcast(ItemDef, StackCount, bCanAdd);
+	return bCanAdd;
 }
 
 ULyraInventoryItemInstance* ULyraInventoryManagerComponent::AddItemDefinition(TSubclassOf<ULyraInventoryItemDefinition> ItemDef, int32 StackCount)

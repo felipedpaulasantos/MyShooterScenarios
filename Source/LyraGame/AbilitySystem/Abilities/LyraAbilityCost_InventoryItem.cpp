@@ -1,8 +1,12 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "LyraAbilityCost_InventoryItem.h"
+#include "AbilitySystem/Abilities/LyraGameplayAbility.h"
 #include "GameplayAbilitySpec.h"
 #include "GameplayAbilitySpecHandle.h"
+#include "Inventory/LyraInventoryManagerComponent.h"
+#include "GameFramework/Controller.h"
+#include "Math/UnrealMathUtility.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraAbilityCost_InventoryItem)
 
@@ -13,7 +17,6 @@ ULyraAbilityCost_InventoryItem::ULyraAbilityCost_InventoryItem()
 
 bool ULyraAbilityCost_InventoryItem::CheckCost(const ULyraGameplayAbility* Ability, const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
 {
-#if 0
 	if (AController* PC = Ability->GetControllerFromActorInfo())
 	{
 		if (ULyraInventoryManagerComponent* InventoryComponent = PC->GetComponentByClass<ULyraInventoryManagerComponent>())
@@ -26,13 +29,11 @@ bool ULyraAbilityCost_InventoryItem::CheckCost(const ULyraGameplayAbility* Abili
 			return InventoryComponent->GetTotalItemCountByDefinition(ItemDefinition) >= NumItemsToConsume;
 		}
 	}
-#endif
 	return false;
 }
 
 void ULyraAbilityCost_InventoryItem::ApplyCost(const ULyraGameplayAbility* Ability, const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo)
 {
-#if 0
 	if (ActorInfo->IsNetAuthority())
 	{
 		if (AController* PC = Ability->GetControllerFromActorInfo())
@@ -48,6 +49,5 @@ void ULyraAbilityCost_InventoryItem::ApplyCost(const ULyraGameplayAbility* Abili
 			}
 		}
 	}
-#endif
 }
 

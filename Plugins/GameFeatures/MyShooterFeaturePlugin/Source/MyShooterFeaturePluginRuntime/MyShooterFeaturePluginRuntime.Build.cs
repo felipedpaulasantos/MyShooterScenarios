@@ -28,7 +28,11 @@ public class MyShooterFeaturePluginRuntime : ModuleRules
 			new string[]
 			{
 				"Core",
-				"GameplayTags",   // FGameplayTag in MusicManagerSubsystem public API
+				"GameplayTags",       // FGameplayTag in public APIs
+				"GameplayAbilities",  // UGameplayEffect, UAttributeSet, FScalableFloat — used in public fragment headers
+				"Engine",             // UAnimMontage, UActorComponent base types
+				"ModularGameplay",    // UControllerComponent (used by UMYSTInventoryCapacityComponent)
+				"LyraGame",           // ULyraInventoryItemFragment base class used in public fragment headers
 			}
 		);
 
@@ -37,10 +41,11 @@ public class MyShooterFeaturePluginRuntime : ModuleRules
 			new string[]
 			{
 				"CoreUObject",
-				"Engine",
 				"Slate",
 				"SlateCore",
-				// ... add private dependencies that you statically link with here ...	
+				// UGameplayTask::ReadyForActivation() is in GameplayTasks (not exported
+				// transitively by GameplayAbilities for linking purposes).
+				"GameplayTasks",
 			}
 		);
 

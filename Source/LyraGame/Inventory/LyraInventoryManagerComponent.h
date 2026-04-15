@@ -16,6 +16,20 @@ struct FLyraInventoryList;
 struct FNetDeltaSerializeInfo;
 struct FReplicationFlags;
 
+/**
+ * Delegate called by CanAddItemDefinition to allow external components (e.g. a
+ * capacity manager) to veto an item addition.  Bind to OnCanAddItem on the
+ * inventory manager.  Set bCanAdd to false to block the addition.
+ *
+ * Note: called on authority only.  All bindings should be idempotent — multiple
+ * bindings may each set bCanAdd to false independently.
+ */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+	FOnCanAddInventoryItem,
+	TSubclassOf<ULyraInventoryItemDefinition>, ItemDef,
+	int32, StackCount,
+	bool&, bCanAdd);
+
 /** A message when an item is added to the inventory */
 USTRUCT(BlueprintType)
 struct FLyraInventoryChangeMessage
@@ -140,6 +154,14 @@ class LYRAGAME_API ULyraInventoryManagerComponent : public UActorComponent
 
 public:
 	ULyraInventoryManagerComponent(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
+
+	/**
+	 * Broadcast before an item is accepted into the inventory, allowing external
+	 * components (e.g. UMYSTInventoryCapacityComponent) to veto additions.
+	 * Authority-only.  Set bCanAdd = false in a binding to block the addition.
+	 */
+	UPROPERTY(BlueprintAssignable, Category=Inventory)
+	FOnCanAddInventoryItem OnCanAddItem;
 
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category=Inventory)
 	bool CanAddItemDefinition(TSubclassOf<ULyraInventoryItemDefinition> ItemDef, int32 StackCount = 1);

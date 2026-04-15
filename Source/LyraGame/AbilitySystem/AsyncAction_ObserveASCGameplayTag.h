@@ -58,6 +58,14 @@ private:
 	UFUNCTION()
 	void HandleGameplayTagChanged(const FGameplayTag Tag, int32 NewCount);
 
+	/**
+	 * Fires when any UWorld begins tearing down.  If it is the world that owns
+	 * our observed ASC we cancel ourselves immediately so the reference chain to
+	 * that world is broken before GC runs (avoids "Previously active world not
+	 * cleaned up" errors in PIE).
+	 */
+	void HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources);
+
 	void Cleanup();
 
 private:
@@ -66,6 +74,9 @@ private:
 
 	FGameplayTag ObservedTag;
 	FDelegateHandle DelegateHandle;
+
+	/** Handle for our FWorldDelegates::OnWorldCleanup subscription. */
+	FDelegateHandle WorldCleanupHandle;
 
 	int32 LastKnownCount = 0;
 };

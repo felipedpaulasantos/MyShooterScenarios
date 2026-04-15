@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerState.h"
+#include "Engine/World.h"
 #include "Logging/LogMacros.h"
 
 #include "AbilitySystemInterface.h"
@@ -119,6 +120,14 @@ void UAsyncAction_ObserveASCGameplayTag::Activate()
 		return;
 	}
 
+	// Subscribe to world cleanup so we can cancel before GC runs.
+	// Without this, when PIE ends the world's objects are marked Garbage but
+	// this action (kept alive by the game instance) still holds ASC via
+	// UPROPERTY, blocking the world from being collected ("Previously active
+	// world not cleaned up by garbage collection").
+	WorldCleanupHandle = FWorldDelegates::OnWorldCleanup.AddUObject(
+		this, &ThisClass::HandleWorldCleanup);
+
 	// Cache initial count, but do not broadcast; users typically want "future" add/remove.
 	LastKnownCount = ASC->GetGameplayTagCount(ObservedTag);
 
@@ -135,11 +144,21 @@ void UAsyncAction_ObserveASCGameplayTag::SetReadyToDestroy()
 
 void UAsyncAction_ObserveASCGameplayTag::Cleanup()
 {
+	// Unsubscribe from world cleanup first.
+	FWorldDelegates::OnWorldCleanup.Remove(WorldCleanupHandle);
+	WorldCleanupHandle.Reset();
+
 	if (IsValid(ASC) && DelegateHandle.IsValid())
 	{
 		ASC->RegisterGameplayTagEvent(ObservedTag, EGameplayTagEventType::NewOrRemoved).Remove(DelegateHandle);
 		DelegateHandle.Reset();
 	}
+
+	// Always null the ASC reference so this action does not keep the PIE world
+	// alive through GC after the session ends.  The UPROPERTY TObjectPtr is a
+	// hard GC reference; leaving it set to a garbage-marked object blocks the
+	// world from being collected (see "Previously active world not cleaned up").
+	ASC = nullptr;
 }
 
 void UAsyncAction_ObserveASCGameplayTag::HandleGameplayTagChanged(const FGameplayTag Tag, int32 NewCount)
@@ -160,3 +179,14 @@ void UAsyncAction_ObserveASCGameplayTag::HandleGameplayTagChanged(const FGamepla
 	}
 }
 
+void UAsyncAction_ObserveASCGameplayTag::HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources)
+{
+	// If the world that owns our observed ASC is tearing down, cancel this
+	// action immediately.  This breaks the reference chain (action -> ASC ->
+	// world) before GC runs, preventing the "Previously active world not
+	// cleaned up" error in PIE.
+	if (ASC && ASC->GetWorld() == World)
+	{
+		SetReadyToDestroy();
+	}
+}

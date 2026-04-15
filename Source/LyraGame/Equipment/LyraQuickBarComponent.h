@@ -53,12 +53,6 @@ public:
 
 	virtual void BeginPlay() override;
 
-private:
-	void UnequipItemInSlot();
-	void EquipItemInSlot();
-
-	ULyraEquipmentManagerComponent* FindEquipmentManager() const;
-
 protected:
 	UPROPERTY()
 	int32 NumSlots = 3;
@@ -68,6 +62,15 @@ protected:
 
 	UFUNCTION()
 	void OnRep_ActiveSlotIndex();
+
+	/** Equips the item sitting in the currently active slot. Override to change equip behaviour. */
+	virtual void EquipItemInSlot();
+
+	/** Unequips whatever is currently equipped from the active slot. Override to change unequip behaviour. */
+	virtual void UnequipItemInSlot();
+
+	/** Finds the EquipmentManagerComponent on the controlled pawn. */
+	virtual ULyraEquipmentManagerComponent* FindEquipmentManager() const;
 
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Slots)
