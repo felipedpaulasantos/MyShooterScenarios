@@ -229,3 +229,27 @@ Checklist:
 - Module build rules: `Source/LyraGame/LyraGame.Build.cs`
 - Config-driven boot settings: `Config/DefaultEngine.ini`, `Config/DefaultGame.ini`
 
+## MYST Inventory / Weapon-Bar system (custom)
+
+All code lives in `Plugins/GameFeatures/MyShooterFeaturePlugin/Source/MyShooterFeaturePluginRuntime/`.
+
+| Phase | What was built | Key files |
+|---|---|---|
+| 1 | Core item fragments | `Public/Inventory/InventoryFragment_ItemCategory.h`, `InventoryFragment_UsableItem.h`, `InventoryFragment_WeaponSlotType.h` |
+| 2 | Inventory attribute set (capacity attributes) | `Public/AbilitySystem/MYSTInventoryAttributeSet.h` |
+| 3 | Capacity enforcement + use-item ability | `Public/Inventory/MYSTInventoryCapacityComponent.h`, `Public/AbilitySystem/Abilities/GA_UseItem.h` |
+| 4 | Weapon bar (fixed + pickup slots) | `Public/Inventory/MYSTWeaponBarComponent.h` |
+| 5 | Blueprint function library | `Public/Inventory/MYSTInventoryFunctionLibrary.h` |
+
+**Message tags** (broadcast via `UGameplayMessageSubsystem`):
+- `MYST.WeaponBar.Message.SlotsChanged` → payload `FMYSTWeaponBarSlotsChangedMessage`
+- `MYST.WeaponBar.Message.ActiveSlotChanged` → payload `FMYSTWeaponBarActiveSlotChangedMessage`
+
+**Gameplay Tags** registered in `Config/DefaultGameplayTags.ini` and natively in `Public/MYSTGameplayTags.h`.
+
+**Implementation how-to:** `Docs/InventorySystem_ImplementationGuide.md`
+
+### Notes for future changes
+- `ULyraEquipmentManagerComponent` and `ULyraEquipmentInstance` in `Source/LyraGame/Equipment/` were patched with `LYRAGAME_API` so the plugin can link against them. Do not remove these.
+- `GameplayMessageRuntime` was added to `PrivateDependencyModuleNames` in the plugin's `Build.cs`.
+

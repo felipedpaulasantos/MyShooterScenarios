@@ -46,6 +46,8 @@ public class MyShooterFeaturePluginRuntime : ModuleRules
 				// UGameplayTask::ReadyForActivation() is in GameplayTasks (not exported
 				// transitively by GameplayAbilities for linking purposes).
 				"GameplayTasks",
+				// UGameplayMessageSubsystem used by UMYSTWeaponBarComponent broadcasts.
+				"GameplayMessageRuntime",
 			}
 		);
 

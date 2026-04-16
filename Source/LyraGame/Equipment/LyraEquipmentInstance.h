@@ -17,7 +17,7 @@ struct FLyraEquipmentActorToSpawn;
  * A piece of equipment spawned and applied to a pawn
  */
 UCLASS(BlueprintType, Blueprintable)
-class ULyraEquipmentInstance : public UObject
+class LYRAGAME_API ULyraEquipmentInstance : public UObject
 {
 	GENERATED_BODY()
 

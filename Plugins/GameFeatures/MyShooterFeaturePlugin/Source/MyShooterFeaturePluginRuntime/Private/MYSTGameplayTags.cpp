@@ -12,5 +12,8 @@ namespace MYSTGameplayTags
 
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Cooldown_UseItem,       "Ability.Cooldown.UseItem");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Cooldown_UseItem_Potion,"Ability.Cooldown.UseItem.Potion");
+
+	UE_DEFINE_GAMEPLAY_TAG(MYST_WeaponBar_Message_SlotsChanged,      "MYST.WeaponBar.Message.SlotsChanged");
+	UE_DEFINE_GAMEPLAY_TAG(MYST_WeaponBar_Message_ActiveSlotChanged, "MYST.WeaponBar.Message.ActiveSlotChanged");
 }
 

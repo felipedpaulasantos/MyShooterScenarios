@@ -44,5 +44,16 @@ namespace MYSTGameplayTags
 
 	/** Per-potion cooldown (health / energy potions). */
 	MYSHOOTERFEATUREPLUGINRUNTIME_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Cooldown_UseItem_Potion);
+
+	// -------------------------------------------------------------------------
+	// Weapon Bar Messages — broadcast via UGameplayMessageSubsystem
+	// Subscribe in HUD widgets to refresh weapon bar display.
+	// -------------------------------------------------------------------------
+
+	/** Payload: FMYSTWeaponBarSlotsChangedMessage. Fired when fixed or pickup slot contents change. */
+	MYSHOOTERFEATUREPLUGINRUNTIME_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(MYST_WeaponBar_Message_SlotsChanged);
+
+	/** Payload: FMYSTWeaponBarActiveSlotChangedMessage. Fired when the active weapon slot changes. */
+	MYSHOOTERFEATUREPLUGINRUNTIME_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(MYST_WeaponBar_Message_ActiveSlotChanged);
 }
 
