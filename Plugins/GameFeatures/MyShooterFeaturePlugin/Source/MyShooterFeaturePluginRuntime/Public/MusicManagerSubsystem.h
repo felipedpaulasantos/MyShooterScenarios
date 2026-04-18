@@ -33,6 +33,13 @@ public:
 	// USubsystem interface
 	// -----------------------------------------------------------------------
 
+	/**
+	 * Returns false when a Blueprint subclass exists and is already loaded,
+	 * preventing the C++ base from being instantiated alongside (or instead of) the BP version.
+	 * This is the standard fix for Blueprint subsystems not working in standalone/Launch Game.
+	 */
+	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
