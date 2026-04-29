@@ -48,9 +48,12 @@ public class MyShooterFeaturePluginRuntime : ModuleRules
 				"GameplayTasks",
 				// UGameplayMessageSubsystem used by UMYSTWeaponBarComponent broadcasts.
 				"GameplayMessageRuntime",
-				// UEnvQueryTest (UMYSTEnvQueryTest_ClaimedSpot) and AAIController
-				"AIModule",
-			}
+				// UEnvQueryTest (UMYSTEnvQueryTest_ClaimedSpot), AAIController,
+			// UBTTaskNode, UBehaviorTreeComponent
+			"AIModule",
+			// UNavigationSystemV1::ProjectPointToNavigation (BTTask_FindPeekLocation)
+			"NavigationSystem",
+		}
 		);
 
 

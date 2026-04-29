@@ -97,9 +97,9 @@ void UBTService_UpdateCombatState::TickNode(UBehaviorTreeComponent& OwnerComp, u
 	}
 
 	// Target in Cover tracking
-	if (TargetKey.IsSet() && HasTargetInCoverKey.IsSet())
+	if (TargetEnemy.IsSet() && HasTargetInCoverKey.IsSet())
 	{
-		AActor* TargetActor = Cast<AActor>(BlackboardComp->GetValueAsObject(TargetKey.SelectedKeyName));
+		AActor* TargetActor = Cast<AActor>(BlackboardComp->GetValueAsObject(TargetEnemy.SelectedKeyName));
 		bool bTargetInCover = false;
 		
 		if (TargetActor)

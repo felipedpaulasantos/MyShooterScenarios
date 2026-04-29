@@ -31,7 +31,7 @@ protected:
 	FBlackboardKeySelector HasTargetInCoverKey;
 
 	UPROPERTY(EditAnywhere, Category = "Blackboard")
-	FBlackboardKeySelector TargetKey;
+	FBlackboardKeySelector TargetEnemy;
 
 	UPROPERTY(EditAnywhere, Category = "Blackboard")
 	FBlackboardKeySelector TargetTimeInCoverKey;
