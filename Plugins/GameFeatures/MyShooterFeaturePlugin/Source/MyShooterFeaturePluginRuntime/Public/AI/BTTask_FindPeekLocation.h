@@ -46,6 +46,7 @@ public:
 	UBTTask_FindPeekLocation(const FObjectInitializer& ObjectInitializer);
 
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
 	virtual FString GetStaticDescription() const override;
 
 	// ── Blackboard keys ─────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ public:
 
 	/** Actor this AI wants to shoot (used for LOS target position). */
 	UPROPERTY(EditAnywhere, Category = "Peek|Keys")
-	FBlackboardKeySelector TargetActorKey;
+	FBlackboardKeySelector TargetEnemyKey;
 
 	/** Output: the chosen peek position (FVector). */
 	UPROPERTY(EditAnywhere, Category = "Peek|Keys")
@@ -91,6 +92,17 @@ public:
 	/** Trace channel for LOS checks. ECC_Visibility is usually correct. */
 	UPROPERTY(EditDefaultsOnly, Category = "Peek|Sampling")
 	TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Visibility;
+
+	/**
+	 * After the coarse step-scan finds the first valid direction, this many
+	 * binary-search passes narrow the result toward CoverLocation.
+	 * Each iteration halves the remaining gap; 4 iterations give ~StepSize/16
+	 * precision (≈ 5 cm with the default 80 cm step).
+	 * Set to 0 to use the raw step result.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Peek|Sampling",
+		meta = (ClampMin = "0", ClampMax = "8"))
+	int32 BinarySearchIterations = 4;
 
 	// ── NavMesh projection ───────────────────────────────────────────────────
 

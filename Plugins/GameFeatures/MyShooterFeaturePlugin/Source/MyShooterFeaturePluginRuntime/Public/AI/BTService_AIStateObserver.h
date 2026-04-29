@@ -44,6 +44,8 @@ public:
 	UBTService_AIStateObserver(const FObjectInitializer& ObjectInitializer);
 
 	virtual FString GetStaticDescription() const override;
+	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
+	virtual void OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 	virtual uint16 GetInstanceMemorySize() const override;
 	virtual void InitializeMemory(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTMemoryInit::Type InitType) const override;
 
@@ -161,6 +163,21 @@ private:
 
 		/** Cached reload state for transition detection. */
 		bool bWasReloading = false;
+
+		/**
+		 * True while we are within the DamageCooldown window.
+		 * Tracked purely in memory so BT aborts/restarts (which call
+		 * InitializeMemory) don't re-arm the flag from a stale BB read.
+		 */
+		bool bDamageArmed = false;
+
+		/**
+		 * False on the very first tick after memory is initialized.
+		 * Prevents a false-positive delta caused by LastKnownHealthPct
+		 * starting at 1.f while the actor may already be at lower health
+		 * (e.g. after a BT abort re-initializes this memory mid-fight).
+		 */
+		bool bInitialized = false;
 
 		FAIStateObserverMemory() = default;
 	};

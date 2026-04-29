@@ -69,6 +69,7 @@ public:
 	UBTService_PeekWillingness(const FObjectInitializer& ObjectInitializer);
 
 	virtual FString GetStaticDescription() const override;
+	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
 	virtual uint16 GetInstanceMemorySize() const override;
 	virtual void InitializeMemory(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTMemoryInit::Type InitType) const override;
 
@@ -205,6 +206,20 @@ protected:
 		meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float PeekThreshold = 0.35f;
 
+	/**
+	 * Minimum score change required to actually write PeekWillingnessScoreKey to
+	 * the Blackboard.  Without this dead-band, micro-changes in input floats
+	 * (HealthPct, TargetCoverTime) produce a different accumulated score every tick,
+	 * firing BB change notifications that trigger Observer-Abort decorators and
+	 * restart active tasks (e.g. EQS_FindCover) before they can complete.
+	 *
+	 * Set to 0.0 to disable (writes every tick — matches legacy behavior).
+	 * Default: 0.02 (2% change required).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Willingness|Threshold",
+		meta = (ClampMin = "0.0", ClampMax = "0.5"))
+	float ScoreWriteDeadBand = 0.02f;
+
 	// ── Blueprint hook ────────────────────────────────────────────────────────
 
 	/**
@@ -225,6 +240,9 @@ private:
 	struct FPeekWillingnessMemory
 	{
 		bool bWasReady = false;
+
+		/** Last score value actually committed to the Blackboard (for dead-band check). */
+		float LastWrittenScore = -1.f;
 
 		FPeekWillingnessMemory() = default;
 	};

@@ -2,6 +2,7 @@
 
 #include "AI/BTService_PeekWillingness.h"
 
+#include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BlackboardComponent.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -18,6 +19,41 @@ UBTService_PeekWillingness::UBTService_PeekWillingness(const FObjectInitializer&
 	// two upstream services, so a slightly longer interval is fine.
 	Interval = 0.20f;
 	RandomDeviation = 0.05f;
+
+	// Restrict each key selector to its expected type.
+	HealthPercentageKey.AddFloatFilter(this,       GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, HealthPercentageKey));
+	IsIsolatedKey.AddBoolFilter(this,              GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, IsIsolatedKey));
+	HasTargetInCoverKey.AddBoolFilter(this,        GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, HasTargetInCoverKey));
+	TargetTimeInCoverKey.AddFloatFilter(this,      GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, TargetTimeInCoverKey));
+	IsTargetEngagingOtherKey.AddBoolFilter(this,   GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, IsTargetEngagingOtherKey));
+	OutOfAmmoKey.AddBoolFilter(this,               GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, OutOfAmmoKey));
+	HasTakenDamageRecentlyKey.AddBoolFilter(this,  GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, HasTakenDamageRecentlyKey));
+	TargetIsReloadingKey.AddBoolFilter(this,       GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, TargetIsReloadingKey));
+	TargetIsLowHealthKey.AddBoolFilter(this,       GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, TargetIsLowHealthKey));
+	PeekWillingnessScoreKey.AddFloatFilter(this,   GET_MEMBER_NAME_CHECKED(UBTService_PeekWillingness, PeekWillingnessScoreKey));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Asset initialisation — resolves SelectedKeyID for every key selector
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UBTService_PeekWillingness::InitializeFromAsset(UBehaviorTree& Asset)
+{
+	Super::InitializeFromAsset(Asset);
+
+	if (UBlackboardData* BBAsset = GetBlackboardAsset())
+	{
+		HealthPercentageKey.ResolveSelectedKey(*BBAsset);
+		IsIsolatedKey.ResolveSelectedKey(*BBAsset);
+		HasTargetInCoverKey.ResolveSelectedKey(*BBAsset);
+		TargetTimeInCoverKey.ResolveSelectedKey(*BBAsset);
+		IsTargetEngagingOtherKey.ResolveSelectedKey(*BBAsset);
+		OutOfAmmoKey.ResolveSelectedKey(*BBAsset);
+		HasTakenDamageRecentlyKey.ResolveSelectedKey(*BBAsset);
+		TargetIsReloadingKey.ResolveSelectedKey(*BBAsset);
+		TargetIsLowHealthKey.ResolveSelectedKey(*BBAsset);
+		PeekWillingnessScoreKey.ResolveSelectedKey(*BBAsset);
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -119,12 +155,23 @@ void UBTService_PeekWillingness::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 	}
 
 	// ─── Clamp and write ──────────────────────────────────────────────────────
-
+	//
+	// Dead-band guard: only write to the BB when the score has changed by more than
+	// ScoreWriteDeadBand.  The score is an arithmetic sum of several input floats;
+	// even tiny changes in HealthPct or TargetCoverTime produce a different float
+	// result every tick, which would fire a BB change notification at the service's
+	// full tick rate.  Any parent-level BB Float Decorator with Observer Aborts
+	// watching this key would then abort the active task (e.g. EQS_FindCover) before
+	// it can finish, causing the BT to loop on the first child indefinitely.
 	const float ClampedScore = FMath::Clamp(Score, 0.f, 1.f);
 
-	if (PeekWillingnessScoreKey.IsSet())
+	if (PeekWillingnessScoreKey.IsSet() && Memory)
 	{
-		BB->SetValueAsFloat(PeekWillingnessScoreKey.SelectedKeyName, ClampedScore);
+		if (FMath::Abs(ClampedScore - Memory->LastWrittenScore) >= ScoreWriteDeadBand)
+		{
+			Memory->LastWrittenScore = ClampedScore;
+			BB->SetValueAsFloat(PeekWillingnessScoreKey.SelectedKeyName, ClampedScore);
+		}
 	}
 
 	// ─── Blueprint threshold transition event ─────────────────────────────────

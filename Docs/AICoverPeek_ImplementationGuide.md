@@ -138,11 +138,11 @@ DrawDebugClaims(Duration, SphereRadius)          → debug draw (dev only)
 
 **Typical BT flow:**
 1. Run `EQS_FindCover` → `UMYSTEnvQueryTest_ClaimedSpot` filters occupied points.
-2. `BTT_ClaimCoverSpot` → `ClaimSpot(CoverLocation, Self)`.
+2. `BTS_CoverClaimLifetime` service activates → `ClaimSpot(CoverLocation, Self)`.
 3. `MoveTo(CoverLocation)`.
-4. On sequence abort / AI death → `BTT_ReleaseCoverSpot` → `ReleaseSpot(Self)`.
+4. On Sequence exit (success **or** abort) → `BTS_CoverClaimLifetime` deactivates → `ReleaseSpot(Self)`.
 
-> ⚠️ **Important:** `BTT_ReleaseCoverSpot` must fire on **sequence abort**, not only on successful completion. Verify this is wired via an **Abort Decorator** or the task's **Abort** pin in the BP Graph — otherwise destroyed/dead AIs will leave ghost claims.
+> ⚠️ **Why tasks alone are not enough:** `BTT_ClaimCoverSpot` returns `Success` and moves on. If the Sequence is later aborted (e.g., by the Peek Willingness Decorator), that task's abort event **never fires** — the claim leaks. See [Wiring Release on Abort](#wiring-release-on-abort-bts_coverclaimelifetime) for the correct pattern.
 
 ---
 
@@ -287,9 +287,9 @@ Root
     │   └── BTTask_TryUseAbility  [Fire ability tag]
     │
     └── Sequence  [TAKE COVER]                       LOW priority (fallback)
+        [Service] BTS_CoverClaimLifetime
         ├── RunEQSQuery → CoverLocation
         │     (EQS_FindCover + UMYSTEnvQueryTest_ClaimedSpot)
-        ├── BTT_ClaimCoverSpot  (BP)
         ├── MoveTo (CoverLocation)
         └── Wait (0.1 s)        ← prevents EQS from hammering every frame
 ```
@@ -351,6 +351,76 @@ Wire each selector to the matching BB key name:
 ### 5. Verify `BTT_ReleaseCoverSpot` fires on abort
 
 In the BT editor, confirm the BP task fires when the **TAKE COVER** Sequence is interrupted — not only when it succeeds. The recommended pattern is an **On Abort** service or a **Decorator On Abort** that calls `ReleaseSpot(SelfActor)`. Without this, the `UMYSTCoverClaimSubsystem` will accumulate ghost claims for dead or fleeing AIs.
+
+---
+
+## Wiring Release on Abort: `BTS_CoverClaimLifetime`
+
+### Why tasks alone are not enough
+
+`BTT_ClaimCoverSpot` returns `Success` and the Sequence moves on to `MoveTo`. If the Peek Willingness Decorator then aborts the Sequence, the BT kills `MoveTo` (the currently running node). `BTT_ClaimCoverSpot` already finished — its abort event **never fires**. `BTT_ReleaseCoverSpot` as a downstream task **never runs** either. The claim leaks.
+
+### The fix: a BTService on the Sequence node
+
+A **BTService** attached to a node fires `Event Receive Deactivation` when that node stops being relevant — on **both normal completion and abort**. This is the standard UE5 cleanup pattern.
+
+### Creating `BTS_CoverClaimLifetime` (Blueprint)
+
+**1.** Create a new Blueprint class inheriting `BTService`. Name it `BTS_CoverClaimLifetime`.
+
+**2.** Set `Interval = 0` and uncheck **Call Tick on Search Start** — no ticking needed.
+
+**3.** Implement two events:
+
+```
+Event Receive Activation AI
+  └─► GetWorldSubsystem (UMYSTCoverClaimSubsystem)
+        └─► ClaimSpot(
+              Location = GetBlackboardValueAsVector[CoverLocation],
+              Claimer  = Controlled Pawn,
+              Radius   = 150.0
+            )
+
+Event Receive Deactivation AI          ← fires on SUCCESS and ABORT
+  └─► GetWorldSubsystem (UMYSTCoverClaimSubsystem)
+        └─► ReleaseSpot(Claimer = Controlled Pawn)
+```
+
+**4.** In the BT, **drag the service onto the TAKE COVER Sequence header** (not into a child slot). Remove `BTT_ClaimCoverSpot` from inside the Sequence — the service's activation now handles claiming.
+
+```
+Sequence  [TAKE COVER]
+  [Service] BTS_CoverClaimLifetime   ← Activation=Claim, Deactivation=Release
+  ├── RunEQSQuery → CoverLocation
+  ├── MoveTo (CoverLocation)
+  └── Wait (0.1 s)
+```
+
+### Alternative: keep the existing BP tasks, add a thin service
+
+If `BTT_ClaimCoverSpot` is reused elsewhere, keep it as a task and add a minimal service that only handles the release:
+
+**1.** Create `BTS_ReleaseCoverOnExit` Blueprint BTService.
+
+**2.** Implement only:
+```
+Event Receive Deactivation AI
+  └─► GetWorldSubsystem (UMYSTCoverClaimSubsystem)
+        └─► ReleaseSpot(Controlled Pawn)
+```
+
+**3.** Attach it to the TAKE COVER Sequence. `BTT_ClaimCoverSpot` stays as a task inside.
+
+```
+Sequence  [TAKE COVER]
+  [Service] BTS_ReleaseCoverOnExit   ← only handles release on exit/abort
+  ├── RunEQSQuery → CoverLocation
+  ├── BTT_ClaimCoverSpot  (BP)       ← still claims on task execution
+  ├── MoveTo (CoverLocation)
+  └── Wait (0.1 s)
+```
+
+> `ReleaseSpot` is safe to call even when no claim exists, so a normal-completion double-release (task then service) is harmless.
 
 ---
 
