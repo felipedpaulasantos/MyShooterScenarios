@@ -20,35 +20,31 @@ UBTService_AIStateObserver::UBTService_AIStateObserver(const FObjectInitializer&
 	NodeName = "AI State Observer (MYST)";
 	bNotifyTick = true;
 
-	// Poll frequently enough for responsive damage / reload detection.
-	// Designers can raise this on cheaper enemy types.
+	// Each AI controller gets its own UObject instance of this service so we
+	// can safely use member variables for per-AI state (LastDamageTime, etc.)
+	// without any manual node-memory management.
+	bCreateNodeInstance = true;
+
 	Interval = 0.15f;
 	RandomDeviation = 0.05f;
 
-	// Default reload tag — must match ActivationOwnedTags on the reload GA.
-	// Resolves at construction; safe because tag tables are registered before gameplay.
-	ReloadTag = FGameplayTag::RequestGameplayTag(FName("Event.Movement.Reload"), /*bErrorIfNotFound=*/false);
+	ReloadTag = FGameplayTag::RequestGameplayTag(FName("Event.Movement.Reload"), false);
 
-	// Restrict each key selector to its expected type so the editor only shows valid keys
-	// and — critically — so IsSet() returns true once ResolveSelectedKey has been called.
-	OutOfAmmoKey.AddBoolFilter(this,              GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, OutOfAmmoKey));
-	HasTakenDamageRecentlyKey.AddBoolFilter(this,  GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, HasTakenDamageRecentlyKey));
-	TargetEnemyKey.AddObjectFilter(this,           GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, TargetEnemyKey), AActor::StaticClass());
-	TargetIsReloadingKey.AddBoolFilter(this,       GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, TargetIsReloadingKey));
-	TargetIsLowHealthKey.AddBoolFilter(this,       GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, TargetIsLowHealthKey));
+	OutOfAmmoKey.AddBoolFilter(this,             GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, OutOfAmmoKey));
+	HasTakenDamageRecentlyKey.AddBoolFilter(this, GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, HasTakenDamageRecentlyKey));
+	TargetEnemyKey.AddObjectFilter(this,          GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, TargetEnemyKey), AActor::StaticClass());
+	TargetIsReloadingKey.AddBoolFilter(this,      GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, TargetIsReloadingKey));
+	TargetIsLowHealthKey.AddBoolFilter(this,      GET_MEMBER_NAME_CHECKED(UBTService_AIStateObserver, TargetIsLowHealthKey));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Asset initialisation — resolves SelectedKeyID for every key selector
+// Asset initialisation
 // ─────────────────────────────────────────────────────────────────────────────
 
 void UBTService_AIStateObserver::InitializeFromAsset(UBehaviorTree& Asset)
 {
 	Super::InitializeFromAsset(Asset);
 
-	// ResolveSelectedKey populates SelectedKeyID from SelectedKeyName against
-	// the Blackboard asset. Without this, IsSet() always returns false and
-	// TickNode silently skips every key write.
 	if (UBlackboardData* BBAsset = GetBlackboardAsset())
 	{
 		OutOfAmmoKey.ResolveSelectedKey(*BBAsset);
@@ -60,36 +56,96 @@ void UBTService_AIStateObserver::InitializeFromAsset(UBehaviorTree& Asset)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Diagnostic: log key bindings on activation so mismapped keys are obvious
+// Become / Cease Relevant
 // ─────────────────────────────────────────────────────────────────────────────
 
 void UBTService_AIStateObserver::OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	Super::OnBecomeRelevant(OwnerComp, NodeMemory);
 
-	UE_LOG(LogTemp, Warning,
-		TEXT("[AIStateObserver] Key map — OutOfAmmo:'%s'  HasTakenDamageRecently:'%s'"
-		     "  TargetEnemy:'%s'  TargetIsReloading:'%s'  TargetIsLowHealth:'%s'"),
-		*OutOfAmmoKey.SelectedKeyName.ToString(),
-		*HasTakenDamageRecentlyKey.SelectedKeyName.ToString(),
-		*TargetEnemyKey.SelectedKeyName.ToString(),
-		*TargetIsReloadingKey.SelectedKeyName.ToString(),
-		*TargetIsLowHealthKey.SelectedKeyName.ToString()
-	);
+	// Reset per-activation state.
+	LastDamageTime = -1.f;
+	bWasReloading  = false;
+	OwnerBTComp    = &OwnerComp;
+
+	// Sync the BB key to the freshly-reset state so no stale true lingers
+	// from a previous activation cycle.
+	if (HasTakenDamageRecentlyKey.IsSet())
+	{
+		if (UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent())
+		{
+			BB->SetValueAsBool(HasTakenDamageRecentlyKey.SelectedKeyName, false);
+		}
+	}
+
+	// Attempt an early bind — may fail if the pawn isn't possessed yet,
+	// in which case the lazy bind in TickNode will retry.
+	if (AAIController* AIC = OwnerComp.GetAIOwner())
+	{
+		if (APawn* Pawn = AIC->GetPawn())
+		{
+			if (ULyraHealthComponent* HealthComp = ULyraHealthComponent::FindHealthComponent(Pawn))
+			{
+				TrackedHealthComp = HealthComp;
+				HealthComp->OnHealthChanged.AddDynamic(this, &UBTService_AIStateObserver::OnAIHealthChanged);
+			}
+		}
+	}
+}
+
+void UBTService_AIStateObserver::OnCeaseRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	UnbindHealthDelegate();
+	OwnerBTComp = nullptr;
+
+	Super::OnCeaseRelevant(OwnerComp, NodeMemory);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Instance memory
+// Health delegate callback  (fires immediately when damage lands)
 // ─────────────────────────────────────────────────────────────────────────────
 
-uint16 UBTService_AIStateObserver::GetInstanceMemorySize() const
+void UBTService_AIStateObserver::OnAIHealthChanged(
+	ULyraHealthComponent* HealthComponent, float OldValue, float NewValue, AActor* /*Instigator*/)
 {
-	return sizeof(FAIStateObserverMemory);
+	if (NewValue >= OldValue) { return; }
+
+	const float MaxHealth = HealthComponent->GetMaxHealth();
+	if (MaxHealth <= 0.f) { return; }
+
+	const float DamageFraction = (OldValue - NewValue) / MaxHealth;
+	if (DamageFraction < DamageReactionThreshold) { return; }
+
+	if (UWorld* World = GetWorld())
+	{
+		LastDamageTime = World->GetTimeSeconds();
+	}
+
+	if (UBehaviorTreeComponent* BTComp = OwnerBTComp.Get())
+	{
+		if (HasTakenDamageRecentlyKey.IsSet())
+		{
+			if (UBlackboardComponent* BB = BTComp->GetBlackboardComponent())
+			{
+				BB->SetValueAsBool(HasTakenDamageRecentlyKey.SelectedKeyName, true);
+			}
+		}
+	}
+
+	OnDamageDetected(DamageFraction);
 }
 
-void UBTService_AIStateObserver::InitializeMemory(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTMemoryInit::Type InitType) const
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UBTService_AIStateObserver::UnbindHealthDelegate()
 {
-	new (NodeMemory) FAIStateObserverMemory();
+	if (ULyraHealthComponent* HealthComp = TrackedHealthComp.Get())
+	{
+		HealthComp->OnHealthChanged.RemoveDynamic(this, &UBTService_AIStateObserver::OnAIHealthChanged);
+	}
+	TrackedHealthComp = nullptr;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,12 +156,12 @@ void UBTService_AIStateObserver::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 {
 	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
 
-	FAIStateObserverMemory* Memory = reinterpret_cast<FAIStateObserverMemory*>(NodeMemory);
+	// Throttled heartbeat removed — re-add if debugging is needed.
 
 	AAIController* AIController = OwnerComp.GetAIOwner();
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
 
-	if (!Memory || !AIController || !Blackboard)
+	if (!AIController || !Blackboard)
 	{
 		return;
 	}
@@ -116,6 +172,25 @@ void UBTService_AIStateObserver::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 		return;
 	}
 
+	// ── Lazy bind ────────────────────────────────────────────────────────────
+	// OnBecomeRelevant may fire before the pawn is possessed (or before its
+	// health component is ready), leaving TrackedHealthComp null.  Retry on
+	// every tick until we succeed.
+	// OwnerBTComp is also set here as a fallback for the same reason.
+	if (!OwnerBTComp.IsValid())
+	{
+		OwnerBTComp = &OwnerComp;
+	}
+
+	if (!TrackedHealthComp.IsValid())
+	{
+		if (ULyraHealthComponent* HealthComp = ULyraHealthComponent::FindHealthComponent(AIPawn))
+		{
+			TrackedHealthComp = HealthComp;
+			HealthComp->OnHealthChanged.AddDynamic(this, &UBTService_AIStateObserver::OnAIHealthChanged);
+		}
+	}
+
 	// ─── 1. AI reload state → OutOfAmmoKey ───────────────────────────────────
 	if (OutOfAmmoKey.IsSet() && ReloadTag.IsValid())
 	{
@@ -124,77 +199,35 @@ void UBTService_AIStateObserver::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 			const bool bIsReloading = AIASC->HasMatchingGameplayTag(ReloadTag);
 			Blackboard->SetValueAsBool(OutOfAmmoKey.SelectedKeyName, bIsReloading);
 
-			// Fire Blueprint transition event
-			if (bIsReloading != Memory->bWasReloading)
+			if (bIsReloading != bWasReloading)
 			{
 				OnAIReloadStateChanged(bIsReloading);
-				Memory->bWasReloading = bIsReloading;
+				bWasReloading = bIsReloading;
 			}
 		}
 	}
 
-	// ─── 2. Damage detection → HasTakenDamageRecentlyKey ────────────────────
+	// ─── 2. HasTakenDamageRecently cooldown expiry ────────────────────────────
 	//
-	// Strategy: compare current health to the value cached last tick.
-	// A drop ≥ DamageReactionThreshold arms the flag and resets the cooldown.
-	// The cooldown counts up via TimeSinceLastHit; once it exceeds DamageCooldown
-	// the flag is cleared.  Everything lives in instance memory — no delegates.
-	//
-	// bInitialized guard: after a BT abort the service memory is re-created with
-	// LastKnownHealthPct = 1.f while the pawn may already be at lower health,
-	// which would produce a spurious large delta on the very first tick and
-	// immediately re-arm the flag.  We skip the comparison on that first tick.
-	if (HasTakenDamageRecentlyKey.IsSet())
+	// Damage arming happens instantly in OnAIHealthChanged (delegate-driven).
+	// This tick only needs to check whether the cooldown window has elapsed
+	// and clear the flag if so.
+	if (HasTakenDamageRecentlyKey.IsSet() && LastDamageTime >= 0.f)
 	{
-		if (ULyraHealthComponent* HealthComp = ULyraHealthComponent::FindHealthComponent(AIPawn))
+		const float Elapsed = GetWorld()->GetTimeSeconds() - LastDamageTime;
+		if (Elapsed >= DamageCooldown)
 		{
-			const float CurrentHealthPct = HealthComp->GetHealthNormalized();
-
-			if (!Memory->bInitialized)
-			{
-				// First tick after (re)initialization — just snapshot health, no comparison.
-				Memory->LastKnownHealthPct = CurrentHealthPct;
-				Memory->bInitialized = true;
-			}
-			else
-			{
-				const float HealthDelta = Memory->LastKnownHealthPct - CurrentHealthPct;
-
-				if (HealthDelta >= DamageReactionThreshold)
-				{
-					// Significant hit this tick — arm the flag and reset the timer.
-					Memory->TimeSinceLastHit = 0.f;
-					Memory->bDamageArmed = true;
-					Blackboard->SetValueAsBool(HasTakenDamageRecentlyKey.SelectedKeyName, true);
-					OnDamageDetected(HealthDelta);
-				}
-				else if (Memory->bDamageArmed)
-				{
-					// Flag is armed — advance the cooldown timer using memory, not the BB.
-					Memory->TimeSinceLastHit += DeltaSeconds;
-					if (Memory->TimeSinceLastHit >= DamageCooldown)
-					{
-						Memory->bDamageArmed = false;
-						Blackboard->SetValueAsBool(HasTakenDamageRecentlyKey.SelectedKeyName, false);
-					}
-				}
-
-				Memory->LastKnownHealthPct = CurrentHealthPct;
-			}
+			LastDamageTime = -1.f;
+			Blackboard->SetValueAsBool(HasTakenDamageRecentlyKey.SelectedKeyName, false);
 		}
 	}
 
 	// ─── 3 & 4. Target-related keys ─────────────────────────────────────────
-	//
-	// Resolve the target actor once and reuse it for both checks below.
-	// GetAbilitySystemComponentFromActor handles the player-owns-ASC-on-PlayerState
-	// case transparently (via IAbilitySystemInterface on ALyraPlayerState).
 	const bool bNeedTargetKeys = TargetIsReloadingKey.IsSet() || TargetIsLowHealthKey.IsSet();
 	if (bNeedTargetKeys && TargetEnemyKey.IsSet())
 	{
 		AActor* TargetActor = Cast<AActor>(Blackboard->GetValueAsObject(TargetEnemyKey.SelectedKeyName));
 
-		// ── 3. Target reloading → TargetIsReloadingKey ───────────────────────
 		if (TargetIsReloadingKey.IsSet())
 		{
 			bool bTargetReloading = false;
@@ -208,7 +241,6 @@ void UBTService_AIStateObserver::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 			Blackboard->SetValueAsBool(TargetIsReloadingKey.SelectedKeyName, bTargetReloading);
 		}
 
-		// ── 4. Target low health → TargetIsLowHealthKey ──────────────────────
 		if (TargetIsLowHealthKey.IsSet())
 		{
 			bool bTargetLowHealth = false;
@@ -225,7 +257,7 @@ void UBTService_AIStateObserver::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Description (shown in the BT node header in the editor)
+// Description
 // ─────────────────────────────────────────────────────────────────────────────
 
 FString UBTService_AIStateObserver::GetStaticDescription() const
@@ -235,7 +267,6 @@ FString UBTService_AIStateObserver::GetStaticDescription() const
 		ReloadTag.IsValid() ? *ReloadTag.ToString() : TEXT("(none set)"),
 		DamageCooldown,
 		DamageReactionThreshold * 100.f,
-		LowHealthThreshold * 100.f
-	);
+		LowHealthThreshold * 100.f);
 }
 

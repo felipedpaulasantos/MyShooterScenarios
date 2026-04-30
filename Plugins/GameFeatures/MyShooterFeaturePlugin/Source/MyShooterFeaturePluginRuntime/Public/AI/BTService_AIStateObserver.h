@@ -7,6 +7,8 @@
 
 #include "BTService_AIStateObserver.generated.h"
 
+class ULyraHealthComponent;
+
 /**
  * BT Service: AI State Observer (MYST)
  *
@@ -16,23 +18,24 @@
  *  │ Blackboard Key (suggested)   │ What it tracks                                           │
  *  ├──────────────────────────────┼──────────────────────────────────────────────────────────┤
  *  │ OutOfAmmo          (Bool)    │ AI ASC has ReloadTag active (e.g. Event.Movement.Reload)  │
- *  │ HasTakenDamageRecently(Bool) │ AI health fell by ≥ DamageReactionThreshold this tick;   │
- *  │                              │ stays true for DamageCooldown seconds, then resets.      │
+ *  │ HasTakenDamageRecently(Bool) │ Turns true on a qualifying hit; resets after              │
+ *  │                              │ DamageCooldown seconds with no further significant hit.  │
  *  │ TargetIsReloading  (Bool)    │ Target ASC has ReloadTag active                          │
  *  │ TargetIsLowHealth  (Bool)    │ Target normalized health < LowHealthThreshold             │
  *  └──────────────────────────────┴──────────────────────────────────────────────────────────┘
  *
- * All health tracking is done via per-node instance memory — no delegates or
- * extra components are required.
+ * HasTakenDamageRecently is driven by a delegate bound to ULyraHealthComponent::OnHealthChanged
+ * rather than tick-based health polling, so it fires exactly when damage lands and the cooldown
+ * is measured in real world-time seconds.  bCreateNodeInstance = true gives each AI its own
+ * UObject instance so per-AI state is stored as plain member variables.
  *
  * ── Blueprint subclassing ───────────────────────────────────────────────────
  * This service is Blueprintable.  Subclass it in Blueprint and implement:
  *   - OnAIReloadStateChanged(bIsNowReloading)   — fires each transition
- *   - OnDamageDetected(HealthLostFraction)       — fires when a hit is detected
+ *   - OnDamageDetected(HealthLostFraction)       — fires immediately when a hit qualifies
  *
  * ── Typical interval ────────────────────────────────────────────────────────
  * Default Interval = 0.15s / RandomDeviation = 0.05s.
- * Lower to ≤ 0.1s for very responsive HasTakenDamageRecently behaviour.
  */
 UCLASS(Blueprintable, meta = (DisplayName = "AI State Observer (MYST)"))
 class MYSHOOTERFEATUREPLUGINRUNTIME_API UBTService_AIStateObserver : public UBTService
@@ -46,8 +49,7 @@ public:
 	virtual FString GetStaticDescription() const override;
 	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
 	virtual void OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
-	virtual uint16 GetInstanceMemorySize() const override;
-	virtual void InitializeMemory(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTMemoryInit::Type InitType) const override;
+	virtual void OnCeaseRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
 protected:
 
@@ -55,96 +57,64 @@ protected:
 
 	// ── Blackboard Keys ────────────────────────────────────────────────────
 
-	/**
-	 * Bool key that is true while the AI is actively reloading.
-	 * Suggested key name: OutOfAmmo
-	 */
+	/** Bool key — true while the AI is actively reloading. Suggested name: OutOfAmmo */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Keys|AI")
 	FBlackboardKeySelector OutOfAmmoKey;
 
-	/**
-	 * Bool key that is true for DamageCooldown seconds after the AI takes a
-	 * significant hit.
-	 * Suggested key name: HasTakenDamageRecently
-	 */
+	/** Bool key — true for DamageCooldown seconds after a qualifying hit. Suggested name: HasTakenDamageRecently */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Keys|AI")
 	FBlackboardKeySelector HasTakenDamageRecentlyKey;
 
-	/**
-	 * Object key holding the current enemy actor (used to resolve target ASC
-	 * and health).
-	 * Suggested key name: TargetEnemy
-	 */
+	/** Object key — current enemy actor. Suggested name: TargetEnemy */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Keys|Target")
 	FBlackboardKeySelector TargetEnemyKey;
 
-	/**
-	 * Bool key that is true while the target actor's ASC has an active
-	 * reload tag.
-	 * Suggested key name: TargetIsReloading
-	 */
+	/** Bool key — true while the target's ASC has an active reload tag. Suggested name: TargetIsReloading */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Keys|Target")
 	FBlackboardKeySelector TargetIsReloadingKey;
 
-	/**
-	 * Bool key that is true when the target's normalized health is below
-	 * LowHealthThreshold.
-	 * Suggested key name: TargetIsLowHealth
-	 */
+	/** Bool key — true when target normalized health < LowHealthThreshold. Suggested name: TargetIsLowHealth */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Keys|Target")
 	FBlackboardKeySelector TargetIsLowHealthKey;
 
 	// ── Tuning ─────────────────────────────────────────────────────────────
 
-	/**
-	 * Gameplay tag checked against the AI's (and target's) ASC to detect an
-	 * active reload.  Matches the ActivationOwnedTags on the reload GA.
-	 * Default: Event.Movement.Reload
-	 */
+	/** Gameplay tag checked against the AI's (and target's) ASC to detect an active reload. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Settings")
 	FGameplayTag ReloadTag;
 
 	/**
-	 * Minimum fraction of MaxHealth lost in a single service tick to count as
-	 * a "significant hit".  Prevents tiny DoT pulses from triggering the flag.
-	 * Range: 0 – 1  (default 0.04 = 4 % of MaxHealth).
+	 * Minimum fraction of MaxHealth lost in a single damage event to arm the flag.
+	 * Prevents tiny DoT pulses from triggering.  Range: 0–1  (default 0.04 = 4%).
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Settings",
 		meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float DamageReactionThreshold = 0.04f;
 
 	/**
-	 * How many seconds HasTakenDamageRecently remains true after a qualifying
-	 * hit.  Tracked entirely via instance memory.
+	 * How many seconds HasTakenDamageRecently stays true after the last qualifying hit.
+	 * Tune this directly on the BT node in the Behavior Tree editor.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Settings",
-		meta = (ClampMin = "0.1", ForceUnits = "s"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer",
+		meta = (ClampMin = "0.1", UIMin = "1.0", UIMax = "10.0", ForceUnits = "s",
+		        DisplayName = "Damage Cooldown (s)"))
 	float DamageCooldown = 4.f;
 
-	/**
-	 * Normalized health value (0 – 1) below which the target is flagged as
-	 * "low health" in the TargetIsLowHealthKey.
-	 */
+	/** Normalized health value (0–1) below which the target is flagged as low health. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Observer|Settings",
 		meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float LowHealthThreshold = 0.35f;
 
 	// ── Blueprint Event Hooks ───────────────────────────────────────────────
 
-	/**
-	 * Called every time the AI's reload state transitions.
-	 * bIsNowReloading == true  → AI started reloading.
-	 * bIsNowReloading == false → AI finished / interrupted reload.
-	 * Override in Blueprint to trigger barks, animation reactions, etc.
-	 */
+	/** Fires on every reload-state transition (started / finished). */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Observer|Events",
 		meta = (DisplayName = "On AI Reload State Changed"))
 	void OnAIReloadStateChanged(bool bIsNowReloading);
 
 	/**
-	 * Called on the tick that a hit above DamageReactionThreshold is detected.
-	 * HealthLostFraction is the normalized fraction lost this tick (0–1).
-	 * Override in Blueprint for flinch reactions, VO, etc.
+	 * Fires immediately when a hit above DamageReactionThreshold is received.
+	 * HealthLostFraction is the normalized fraction lost in that single hit (0–1).
 	 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Observer|Events",
 		meta = (DisplayName = "On AI Damage Detected"))
@@ -152,34 +122,30 @@ protected:
 
 private:
 
-	/** Per-node instance memory — avoids any heap allocations or delegates. */
-	struct FAIStateObserverMemory
-	{
-		/** Normalized health sampled last tick (to compute delta). */
-		float LastKnownHealthPct = 1.f;
+	/**
+	 * Delegate callback bound to ULyraHealthComponent::OnHealthChanged.
+	 * Updates LastDamageTime when a qualifying hit lands.
+	 * Must be a UFUNCTION so the dynamic multicast delegate can bind to it.
+	 */
+	UFUNCTION()
+	void OnAIHealthChanged(ULyraHealthComponent* HealthComponent, float OldValue, float NewValue, AActor* Instigator);
 
-		/** Seconds elapsed since the last qualifying hit. */
-		float TimeSinceLastHit = 0.f;
+	/** Unbinds and clears the health delegate. Safe to call even if nothing is bound. */
+	void UnbindHealthDelegate();
 
-		/** Cached reload state for transition detection. */
-		bool bWasReloading = false;
+	// Per-AI instance state (valid because bCreateNodeInstance = true).
 
-		/**
-		 * True while we are within the DamageCooldown window.
-		 * Tracked purely in memory so BT aborts/restarts (which call
-		 * InitializeMemory) don't re-arm the flag from a stale BB read.
-		 */
-		bool bDamageArmed = false;
+	/** World-time of the last qualifying damage hit. -1 means not currently armed. */
+	float LastDamageTime = -1.f;
 
-		/**
-		 * False on the very first tick after memory is initialized.
-		 * Prevents a false-positive delta caused by LastKnownHealthPct
-		 * starting at 1.f while the actor may already be at lower health
-		 * (e.g. after a BT abort re-initializes this memory mid-fight).
-		 */
-		bool bInitialized = false;
+	/** Cached reload state for transition-edge detection in TickNode. */
+	bool bWasReloading = false;
 
-		FAIStateObserverMemory() = default;
-	};
+
+	/** Weak ref to the health component we're listening to, used for unbinding. */
+	TWeakObjectPtr<ULyraHealthComponent> TrackedHealthComp;
+
+	/** Weak ref to the BT component, used to write the BB from the health callback. */
+	TWeakObjectPtr<UBehaviorTreeComponent> OwnerBTComp;
 };
 
