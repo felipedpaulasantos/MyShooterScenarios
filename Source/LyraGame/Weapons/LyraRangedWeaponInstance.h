@@ -76,6 +76,14 @@ public:
 		return BulletTraceSweepRadius;
 	}
 
+	/** Loudness (0–1) reported to UAISense_Hearing on each shot. 0 = silenced / AI hearing disabled. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Config")
+	float GetShotNoiseLoudness() const { return ShotNoiseLoudness; }
+
+	/** Max hearing range override (cm). 0 = use the AI Hearing Config's range. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Lyra|Weapon|Config")
+	float GetShotNoiseMaxRange() const { return ShotNoiseMaxRange; }
+
 	/** Additional runtime spread multiplier that can be adjusted by Blueprint (e.g., bots under specific conditions). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Lyra|Weapon|Spread", meta=(ClampMin=0.0))
 	float RuntimeSpreadMultiplier = 1.0f;
@@ -197,6 +205,31 @@ protected:
 	// Number of bullets to fire in a single cartridge (typically 1, but may be more for shotguns)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon Config")
 	int32 BulletsPerCartridge = 1;
+
+	// ── AI Hearing ────────────────────────────────────────────────────────
+	// UAISense_Hearing is disconnected from the audio engine — a shot sound
+	// alone never reaches the AI.  These two properties drive the explicit
+	// UAISense_Hearing::ReportNoiseEvent() call made by the firing ability.
+
+	/**
+	 * Loudness of the gunshot noise reported to the AI Perception System.
+	 * Range 0–1; the value is multiplied by the AI Hearing Config's HearingRange
+	 * to compute the effective detection radius.  1.0 = max range per config.
+	 * Set to 0 to disable AI hearing for this weapon entirely.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Config|AI Hearing",
+		meta = (ClampMin = "0.0", ClampMax = "1.0", DisplayName = "Shot Noise Loudness"))
+	float ShotNoiseLoudness = 1.0f;
+
+	/**
+	 * Maximum range (cm) at which this weapon's shot noise can be heard by AI.
+	 * When 0, the UAISense_Hearing config's HearingRange is used unmodified.
+	 * Set a non-zero value to cap hearing distance regardless of sensor config
+	 * (e.g. suppress a silenced weapon to 600 cm).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon Config|AI Hearing",
+		meta = (ClampMin = "0.0", ForceUnits = "cm", DisplayName = "Shot Noise Max Range (0 = sense config)"))
+	float ShotNoiseMaxRange = 0.0f;
 
 	// The maximum distance at which this weapon can deal damage
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon Config", meta=(ForceUnits=cm))

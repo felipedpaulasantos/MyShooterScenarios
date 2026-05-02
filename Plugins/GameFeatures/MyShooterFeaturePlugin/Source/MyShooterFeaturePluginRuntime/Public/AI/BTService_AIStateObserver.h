@@ -51,6 +51,14 @@ public:
 	virtual void OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 	virtual void OnCeaseRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 
+	/**
+	 * Safety net: unbind the health delegate if GC collects this node instance
+	 * before OnCeaseRelevant fires (e.g. forceful actor destroy during PIE stop).
+	 * Without this, ULyraHealthComponent::OnHealthChanged retains a dangling
+	 * FScriptDelegate pointing to the destroyed UObject.
+	 */
+	virtual void BeginDestroy() override;
+
 protected:
 
 	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;

@@ -102,6 +102,22 @@ void UBTService_AIStateObserver::OnCeaseRelevant(UBehaviorTreeComponent& OwnerCo
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BeginDestroy — last-resort delegate cleanup
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UBTService_AIStateObserver::BeginDestroy()
+{
+	// OnCeaseRelevant is the normal cleanup path.  This covers the edge case
+	// where GC collects the node instance before the BT shuts down cleanly
+	// (e.g. a sudden actor destroy during PIE stop or a level transition that
+	// bypasses the normal BT stop sequence).  Without this, the health
+	// component's OnHealthChanged multicast would retain a dangling binding.
+	UnbindHealthDelegate();
+
+	Super::BeginDestroy();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Health delegate callback  (fires immediately when damage lands)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -110,16 +126,23 @@ void UBTService_AIStateObserver::OnAIHealthChanged(
 {
 	if (NewValue >= OldValue) { return; }
 
+	// Skip the killing blow: health just reached 0, the BT is about to stop
+	// anyway.  Arming HasTakenDamageRecently on a dead pawn is meaningless and
+	// risks firing the OnDamageDetected Blueprint event in a half-torn-down state.
+	if (NewValue <= 0.f) { return; }
+
+	// Bail out during world teardown — the BB and BT component may be in the
+	// process of being destroyed, and writing to them would be unsafe.
+	UWorld* World = GetWorld();
+	if (!World || World->bIsTearingDown) { return; }
+
 	const float MaxHealth = HealthComponent->GetMaxHealth();
 	if (MaxHealth <= 0.f) { return; }
 
 	const float DamageFraction = (OldValue - NewValue) / MaxHealth;
 	if (DamageFraction < DamageReactionThreshold) { return; }
 
-	if (UWorld* World = GetWorld())
-	{
-		LastDamageTime = World->GetTimeSeconds();
-	}
+	LastDamageTime = World->GetTimeSeconds();
 
 	if (UBehaviorTreeComponent* BTComp = OwnerBTComp.Get())
 	{
@@ -130,9 +153,13 @@ void UBTService_AIStateObserver::OnAIHealthChanged(
 				BB->SetValueAsBool(HasTakenDamageRecentlyKey.SelectedKeyName, true);
 			}
 		}
-	}
 
-	OnDamageDetected(DamageFraction);
+		// Fire the Blueprint hook only while the BT is still running.
+		// Moving this inside the OwnerBTComp guard ensures BP subclass logic
+		// (which may access BB keys or the AI pawn) is never called on a
+		// stopped / orphaned BT.
+		OnDamageDetected(DamageFraction);
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -214,7 +241,13 @@ void UBTService_AIStateObserver::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 	// and clear the flag if so.
 	if (HasTakenDamageRecentlyKey.IsSet() && LastDamageTime >= 0.f)
 	{
-		const float Elapsed = GetWorld()->GetTimeSeconds() - LastDamageTime;
+		// GetWorld() must be null-checked here: TickNode can theoretically be
+		// called on a node whose outer world is tearing down (edge case during
+		// PIE stop if the BT isn't shut down cleanly before GC).
+		UWorld* World = GetWorld();
+		if (!World) { return; }
+
+		const float Elapsed = World->GetTimeSeconds() - LastDamageTime;
 		if (Elapsed >= DamageCooldown)
 		{
 			LastDamageTime = -1.f;

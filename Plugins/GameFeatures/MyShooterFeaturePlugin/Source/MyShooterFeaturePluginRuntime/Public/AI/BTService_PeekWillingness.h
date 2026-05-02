@@ -71,6 +71,14 @@ public:
 	virtual FString GetStaticDescription() const override;
 	virtual void InitializeFromAsset(UBehaviorTree& Asset) override;
 	virtual uint16 GetInstanceMemorySize() const override;
+
+	/**
+	 * Placement-new constructor for FPeekWillingnessMemory.
+	 * NOTE: if FPeekWillingnessMemory ever gains non-trivial members (e.g.
+	 * FTimerHandle, TArray, TWeakObjectPtr), add a matching CleanupMemory
+	 * override that calls Memory->~FPeekWillingnessMemory() to avoid leaks.
+	 * (CleanupMemory is intentionally absent while the struct is all-POD.)
+	 */
 	virtual void InitializeMemory(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTMemoryInit::Type InitType) const override;
 
 protected:

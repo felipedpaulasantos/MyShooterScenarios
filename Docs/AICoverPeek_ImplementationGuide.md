@@ -1,13 +1,13 @@
 ﻿# MYST AI Cover & Peek System — Implementation Guide
 
-> **Covers:** Cover claiming · EQS filtering · Peek location search · State observation · Peek willingness scoring  
-> **Classes implemented:** `UMYSTCoverClaimSubsystem` · `UMYSTEnvQueryTest_ClaimedSpot` · `UBTTask_FindPeekLocation` · `UBTService_AIStateObserver` · `UBTService_PeekWillingness`
+> **Covers:** Cover claiming · EQS filtering · Peek location search · Perception · State observation · Peek willingness scoring  
+> **Classes implemented:** `UMYSTCoverClaimSubsystem` · `UMYSTEnvQueryTest_ClaimedSpot` · `UBTTask_FindPeekLocation` · `UBTService_PlayerPerception` · `UBTService_AIStateObserver` · `UBTService_PeekWillingness`
 
 ---
 
 ## System Overview
 
-The system gives each AI three behaviours — **find cover**, **stay in cover**, and **peek out to shoot** — driven entirely by reactive BT Decorators and two aggregating BTServices. There are no random timers; every state transition is triggered by a GAS tag change, a health delta, or a scored threshold crossing.
+The system gives each AI three behaviours — **find cover**, **stay in cover**, and **peek out to shoot** — driven entirely by reactive BT Decorators and three aggregating BTServices. There are no random timers; every state transition is triggered by a perception stimulus, a GAS tag change, a health delta, or a scored threshold crossing.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -22,10 +22,15 @@ The system gives each AI three behaviours — **find cover**, **stay in cover**,
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Behavior Tree  [Combat Selector Root]                               │
 │                                                                      │
-│  [Service] BTService_UpdateCombatState  ──► HealthPct, IsIsolated,   │
-│                                             HasTargetInCover,        │
-│                                             TargetTimeInCover,       │
-│                                             IsTargetEngagingOther    │
+│  [Service] BTService_PlayerPerception  ──► HasSeenPlayer,            │
+│                                            HasHeardPlayer,           │
+│                                            TargetEnemy,              │
+│                                            LastKnownLocation         │
+│                                                                      │
+│  [Service] BTService_UpdateCombatState ──► HealthPct, IsIsolated,   │
+│                                            HasTargetInCover,        │
+│                                            TargetTimeInCover,       │
+│                                            IsTargetEngagingOther    │
 │                                                                      │
 │  [Service] BTService_AIStateObserver   ──►  OutOfAmmo,               │
 │                                             HasTakenDamageRecently,  │
@@ -55,14 +60,14 @@ The system gives each AI three behaviours — **find cover**, **stay in cover**,
 | Key | Type | Writer |
 |---|---|---|
 | `SelfActor` | Object | AI Controller (built-in) |
-| `TargetEnemy` | Object | Perception / custom setter |
+| `TargetEnemy` | Object | `BTService_PlayerPerception` |
 
 ### Location
 
 | Key | Type | Writer |
 |---|---|---|
 | `MoveGoal` | Vector | MoveTo tasks |
-| `LastKnownLocation` | Vector | Perception |
+| `LastKnownLocation` | Vector | `BTService_PlayerPerception` |
 | `LookAtLocation` | Vector | Custom |
 | `CoverLocation` | Vector | `BTT_ClaimCoverSpot` (BP) |
 | `PeekLocation` | Vector | `UBTTask_FindPeekLocation` |
@@ -71,9 +76,10 @@ The system gives each AI three behaviours — **find cover**, **stay in cover**,
 
 | Key | Type | Writer | Condition |
 |---|---|---|---|
-| `OutOfAmmo` | Bool | `BTService_AIStateObserver` | AI ASC has `Event.Movement.Reload` tag |
-| `HasSeenPlayer` | Bool | Perception | — |
+| `HasSeenPlayer` | Bool | `BTService_PlayerPerception` | Sight stimulus received; decays after `LostSightCooldown` s |
+| `HasHeardPlayer` | Bool | `BTService_PlayerPerception` | Qualifying noise received; decays after `LostHearingCooldown` s |
 | `HasEngagedPlayer` | Bool | Custom | — |
+| `OutOfAmmo` | Bool | `BTService_AIStateObserver` | AI ASC has `Event.Movement.Reload` tag |
 | `HasTakenDamageRecently` | Bool | `BTService_AIStateObserver` | Health dropped ≥ threshold; auto-clears after `DamageCooldown` s |
 | `TargetIsReloading` | Bool | `BTService_AIStateObserver` | Target ASC has `Event.Movement.Reload` tag |
 | `TargetIsLowHealth` | Bool | `BTService_AIStateObserver` | Target health < `LowHealthThreshold` |
@@ -96,7 +102,7 @@ The system gives each AI three behaviours — **find cover**, **stay in cover**,
 | `TimeSinceLastSpotted` | Float | Custom |
 | `HasSpottingBeenReported` | Bool | Custom |
 
-> **To add the 3 new state keys and 2 new float keys:** open `BB_ShooterAI` in the BB editor, click **New Key**, and add `TargetIsReloading` (Bool), `TargetIsLowHealth` (Bool), and `PeekWillingnessScore` (Float).
+> **To add the new BB keys:** open `BB_ShooterAI` in the BB editor, click **New Key**, and add `HasSeenPlayer` (Bool), `HasHeardPlayer` (Bool), `TargetIsReloading` (Bool), `TargetIsLowHealth` (Bool), and `PeekWillingnessScore` (Float).
 
 ---
 
@@ -107,7 +113,8 @@ The system gives each AI three behaviours — **find cover**, **stay in cover**,
 | `UMYSTCoverClaimSubsystem` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | WorldSubsystem tracking which cover spots are claimed |
 | `UMYSTEnvQueryTest_ClaimedSpot` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | EQS test: filters points claimed by other AIs |
 | `UBTTask_FindPeekLocation` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Samples strafe positions from cover, NavProjects, LOS-traces, writes `PeekLocation` |
-| `UBTService_AIStateObserver` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Polls GAS tags and health; writes `OutOfAmmo`, `HasTakenDamageRecently`, `TargetIsReloading`, `TargetIsLowHealth` |
+| `UBTService_PlayerPerception` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Delegate-driven perception (sight/hearing/damage); writes `HasSeenPlayer`, `HasHeardPlayer`, `TargetEnemy`, `LastKnownLocation` |
+| `UBTService_AIStateObserver` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Polls GAS tags; delegate-driven damage arming; writes `OutOfAmmo`, `HasTakenDamageRecently`, `TargetIsReloading`, `TargetIsLowHealth` |
 | `UBTService_PeekWillingness` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Aggregates all state keys into `PeekWillingnessScore` [0–1] |
 
 Blueprint-only (no C++ replacement needed):
@@ -178,17 +185,88 @@ Runs synchronously and returns `Success` or `Failure`.
 
 ---
 
-## `UBTService_AIStateObserver`
+## `UBTService_PlayerPerception`
 
-Ticks at `Interval = 0.15s` (± `RandomDeviation = 0.05s`). Uses **per-node instance memory** (`FAIStateObserverMemory`) — no delegates or extra components.
+**Node name:** `Player Perception (MYST)`  
+Ticks at `Interval = 0.1s` (± `RandomDeviation = 0.05s`). Uses `bCreateNodeInstance = true` — each AI controller owns its own UObject instance so timestamps and cached state are stored as plain member variables.
+
+Detection is **fully delegate-driven**: the service binds to `UAIPerceptionComponent::OnTargetPerceptionUpdated` on `OnBecomeRelevant` (with a lazy-retry in `TickNode` if the component isn't ready yet). Tick logic only handles cooldown/retention **expiry**.
 
 ### Key writes
 
 ```
-OutOfAmmo              ← AI ASC HasMatchingGameplayTag(ReloadTag)
-HasTakenDamageRecently ← health delta >= DamageReactionThreshold → armed for DamageCooldown s
-TargetIsReloading      ← Target ASC HasMatchingGameplayTag(ReloadTag)
-TargetIsLowHealth      ← Target GetHealthNormalized() < LowHealthThreshold
+HasSeenPlayer         ← true immediately on a sight stimulus; cleared after LostSightCooldown s
+                        (expiry polls GetCurrentlyPerceivedActors to avoid false expiry while
+                        the player is still continuously inside the sight cone)
+HasHeardPlayer        ← true on a qualifying noise (Loudness >= HearingLoudnessThreshold);
+                        cleared after LostHearingCooldown s
+TargetEnemy           ← set to detected pawn on sight/hearing/damage; cleared together with
+                        LastKnownLocation (LastKnownLocationRetention expiry)
+LastKnownLocation     ← updated on every sight refresh (live actor location) or hearing event
+                        (stimulus location); set to instigator position on damage events;
+                        cleared LastKnownLocationRetention s after the last detection
+```
+
+### Key properties
+
+| Property | Default | Notes |
+|---|---|---|
+| `HasSeenPlayerKey` | — | Bool BB key |
+| `TargetEnemyKey` | — | Object BB key (`AActor`) |
+| `LastKnownLocationKey` | — | Vector BB key |
+| `HasHeardPlayerKey` | — | Bool BB key; leave unset to disable hearing |
+| `LostSightCooldown` | `5.0 s` | How long `HasSeenPlayer` stays `true` after LOS breaks |
+| `LastKnownLocationRetention` | `15.0 s` | How long `LastKnownLocation` + `TargetEnemy` persist; should be ≥ `LostSightCooldown` |
+| `bOnlyDetectPlayers` | `true` | Skips non-player-controlled pawns for sight/hearing |
+| `LostHearingCooldown` | `3.0 s` | How long `HasHeardPlayer` stays `true` |
+| `HearingLoudnessThreshold` | `0.5` | Minimum `FAIStimulus::Strength` to arm `HasHeardPlayer` |
+| `bOnlyDamageByPlayers` | `true` | Skips damage from non-player instigators |
+
+### Blueprint hooks (implement in BP subclasses)
+
+| Event | When it fires |
+|---|---|
+| `OnPlayerFirstSpotted(SpottedPawn)` | First `false → true` transition of `HasSeenPlayer` |
+| `OnPlayerLost()` | `HasSeenPlayer` transitions `true → false` (cooldown elapsed and no active perception) |
+| `OnNoiseHeard(NoiseMaker, Location, Loudness)` | Every qualifying hearing stimulus |
+| `OnDamageTaken(AttackerPawn, InstigatorLocation)` | Every damage stimulus that passes the player filter |
+
+### Setup checklist
+
+1. Add `UAIPerceptionComponent` to the AI Controller Blueprint.
+   - **Sight config** — set `SightRadius`, `LoseSightRadius`, `PeripheralVisionAngle`; set `DetectEnemies=true`, `DetectFriendlies=false`.
+   - **Hearing config** — set radius and affiliation.
+   - **Damage config** (`UAISenseConfig_Damage`) — no affiliation filter needed.
+2. Ensure the player Character Blueprint has `UAIPerceptionStimuliSourceComponent` (or enable `bAutoRegisterAllPawnsAsSources` in AI Perception System settings).
+3. In your damage-handling code (e.g. inside a GA or `ULyraHealthComponent` callback) call:
+   ```cpp
+   UAISense_Damage::ReportDamageEvent(World, DamagedActor, Instigator,
+                                      Amount, InstigatorLocation, HitLocation);
+   ```
+4. Place this service on the BT root Selector and wire the four BB key selectors.
+5. Tune `LostSightCooldown` and `LastKnownLocationRetention` on the node.
+
+> **Why `UAIPerceptionComponent` over `UPawnSensingComponent`:**  
+> `ALyraPlayerBotController` already implements `GetTeamAttitudeTowards`, which `UAIPerceptionComponent` uses natively for affiliation filtering. A single `OnTargetPerceptionUpdated` delegate covers sight, hearing, and damage with full UE5 per-sense config support and editor tooling (AI Perception debug channel).
+
+---
+
+## `UBTService_AIStateObserver`
+
+**Node name:** `AI State Observer (MYST)`  
+Ticks at `Interval = 0.15s` (± `RandomDeviation = 0.05s`). Uses `bCreateNodeInstance = true` — each AI controller gets its own UObject instance; per-AI state (`LastDamageTime`, `bWasReloading`) is stored as plain member variables with no manual node-memory management.
+
+**`HasTakenDamageRecently` is delegate-driven, not tick-polled.** The service binds to `ULyraHealthComponent::OnHealthChanged` in `OnBecomeRelevant` (with a lazy-retry in `TickNode` for late pawn possession). The BB key is set to `true` *immediately* when a qualifying hit lands — the tick only handles the cooldown expiry.
+
+### Key writes
+
+```
+OutOfAmmo              ← AI ASC HasMatchingGameplayTag(ReloadTag)   [polled each tick]
+HasTakenDamageRecently ← armed immediately via OnHealthChanged delegate when damage fraction
+                          >= DamageReactionThreshold; cleared DamageCooldown s later by tick
+TargetIsReloading      ← Target ASC HasMatchingGameplayTag(ReloadTag)   [polled each tick]
+TargetIsLowHealth      ← ULyraHealthComponent::GetHealthNormalized() < LowHealthThreshold
+                          [polled each tick, resolved via FindHealthComponent]
 ```
 
 ### Key properties
@@ -196,24 +274,29 @@ TargetIsLowHealth      ← Target GetHealthNormalized() < LowHealthThreshold
 | Property | Default | Notes |
 |---|---|---|
 | `ReloadTag` | `Event.Movement.Reload` | Pre-resolved at construction. Must match `ActivationOwnedTags` on the reload GA |
-| `DamageReactionThreshold` | `0.04` (4 % MaxHP) | Filters DoT micro-pulses |
+| `DamageReactionThreshold` | `0.04` (4% MaxHP) | Filters DoT micro-pulses |
 | `DamageCooldown` | `4.0 s` | How long `HasTakenDamageRecently` stays `true` after a qualifying hit |
-| `LowHealthThreshold` | `0.35` (35 %) | Target health gate for `TargetIsLowHealth` |
+| `LowHealthThreshold` | `0.35` (35%) | Target health gate for `TargetIsLowHealth` |
 
 ### Blueprint hooks (implement in BP subclasses)
 
 | Event | When it fires |
 |---|---|
 | `OnAIReloadStateChanged(bool bIsNowReloading)` | Every reload state transition (start & end) |
-| `OnDamageDetected(float HealthLostFraction)` | The tick a qualifying damage hit is detected |
+| `OnDamageDetected(float HealthLostFraction)` | The moment a qualifying damage hit is detected (inside the `OnHealthChanged` delegate, not next tick) |
 
 > **Player ASC resolution note:** `UAbilitySystemGlobals::GetAbilitySystemComponentFromActor` resolves the Lyra player's ASC from `ALyraPlayerState` automatically via `IAbilitySystemInterface`. You only need to pass the pawn (the value stored in `TargetEnemy`).
+
+> **Health component binding:** `ULyraHealthComponent::FindHealthComponent(Pawn)` is used to locate the component. The bind is attempted eagerly in `OnBecomeRelevant`; `TickNode` retries every tick until it succeeds (handles late pawn possession after the service becomes relevant).
 
 ---
 
 ## `UBTService_PeekWillingness`
 
-Ticks at `Interval = 0.20s` as a pure aggregator — reads keys from both upstream services and writes `PeekWillingnessScore` [0, 1].
+**Node name:** `Peek Willingness (MYST)`  
+Ticks at `Interval = 0.20s` (± `RandomDeviation = 0.05s`) as a pure aggregator — reads keys written by both upstream services and writes `PeekWillingnessScore` [0, 1].
+
+Uses **per-node instance memory** (`FPeekWillingnessMemory`) — a private struct that tracks `bWasReady` (for the Blueprint threshold transition event) and `LastWrittenScore` (for the dead-band write guard described below). Unlike `BTService_AIStateObserver`, this service does **not** use `bCreateNodeInstance`; the memory is stored in the standard BT node memory block.
 
 ### Score formula
 
@@ -236,24 +319,29 @@ if IsIsolated:                  Score -= IsolatedPenalty          (0.20)
 Score = Clamp(Score, 0.0, 1.0)
 ```
 
+Score is only written to the BB when it has changed by more than `ScoreWriteDeadBand` (see below).
+
 When `Score >= PeekThreshold` (default `0.35`) the Peek Sequence is unblocked. The BT Decorator (with `AbortSelf+LowerPriority`) makes this fully reactive — no extra C++ event-handling needed.
 
 ### Key properties
 
-| Property | Default |
-|---|---|
-| `PeekThreshold` | `0.35` |
-| `TargetIsReloadingBonus` | `0.40` |
-| `TargetExposedBonus` | `0.25` |
-| `TargetLowHealthBonus` | `0.20` |
-| `TargetDistractedBonus` | `0.15` |
-| `TargetOverduePeekBonus` | `0.10` |
-| `TargetOverduePeekTime` | `5.0 s` |
-| `OutOfAmmoPenalty` | `0.60` |
-| `RecentlyHitPenalty` | `0.40` |
-| `LowSelfHealthPenalty` | `0.30` |
-| `LowSelfHealthThreshold` | `0.30` |
-| `IsolatedPenalty` | `0.20` |
+| Property | Default | Notes |
+|---|---|---|
+| `PeekThreshold` | `0.35` | Score gate for the BB Decorator |
+| `ScoreWriteDeadBand` | `0.02` | Minimum score delta required to write to BB (**critical** — see note below) |
+| `TargetIsReloadingBonus` | `0.40` | |
+| `TargetExposedBonus` | `0.25` | |
+| `TargetLowHealthBonus` | `0.20` | |
+| `TargetDistractedBonus` | `0.15` | |
+| `TargetOverduePeekBonus` | `0.10` | |
+| `TargetOverduePeekTime` | `5.0 s` | |
+| `OutOfAmmoPenalty` | `0.60` | |
+| `RecentlyHitPenalty` | `0.40` | |
+| `LowSelfHealthPenalty` | `0.30` | |
+| `LowSelfHealthThreshold` | `0.30` | Self health fraction that triggers the penalty |
+| `IsolatedPenalty` | `0.20` | |
+
+> ⚠️ **`ScoreWriteDeadBand` — do not set to 0 in production.** The score is an arithmetic sum of several input floats (`HealthPct`, `TargetCoverTime`). Even micro-changes produce a different float result every tick. Without the dead-band, each tick fires a BB change notification on `PeekWillingnessScore`, which triggers any `Observer-Abort` Decorator watching that key — restarting `EQS_FindCover` before it can finish and causing the BT to loop indefinitely. Default `0.02` suppresses this without meaningfully delaying peeks.
 
 ### Blueprint hook
 
@@ -265,17 +353,19 @@ When `Score >= PeekThreshold` (default `0.35`) the Peek Sequence is unblocked. T
 
 ## Behavior Tree Layout
 
-Attach all three services to the **Combat Selector root** so they tick regardless of which branch is active.
+Attach all four services to the **Combat Selector root** so they tick regardless of which branch is active. Service execution order (top-to-bottom) ensures `PlayerPerception` populates `TargetEnemy` before `AIStateObserver` reads it, and `AIStateObserver` populates its outputs before `PeekWillingness` aggregates them.
 
 ```
 Root
 └── Selector  [Combat Root]
-    ├── [Service] BTService_UpdateCombatState        ← tick first
-    ├── [Service] BTService_AIStateObserver          ← tick second
-    ├── [Service] BTService_PeekWillingness          ← tick last (reads outputs of both)
+    ├── [Service] BTService_PlayerPerception         ← tick first (populates TargetEnemy)
+    ├── [Service] BTService_UpdateCombatState        ← tick second
+    ├── [Service] BTService_AIStateObserver          ← tick third
+    ├── [Service] BTService_PeekWillingness          ← tick last (reads outputs of all three)
     │
     ├── Sequence  [PEEK & SHOOT]                     HIGH priority
     │   ├── Decorator: BB  TargetEnemy != null            AbortSelf+LowerPriority
+    │   ├── Decorator: BB  HasSeenPlayer == true           AbortSelf+LowerPriority
     │   ├── Decorator: BB  PeekWillingnessScore >= 0.35   AbortSelf+LowerPriority ◄ reactive gate
     │   ├── Decorator: BB  OutOfAmmo == false              AbortSelf
     │   ├── Decorator: BB  HasTakenDamageRecently == false AbortSelf
@@ -308,11 +398,26 @@ Open `BB_ShooterAI` → **New Key** for each:
 
 | Key Name | Key Type |
 |---|---|
+| `HasSeenPlayer` | Bool |
+| `HasHeardPlayer` | Bool |
 | `TargetIsReloading` | Bool |
 | `TargetIsLowHealth` | Bool |
 | `PeekWillingnessScore` | Float |
 
-### 2. Configure `BTService_AIStateObserver` on the Combat Selector
+### 2. Configure `BTService_PlayerPerception` on the Combat Selector
+
+Wire each selector to the matching BB key name:
+
+| Selector field | BB key to point at |
+|---|---|
+| `HasSeenPlayerKey` | `HasSeenPlayer` |
+| `TargetEnemyKey` | `TargetEnemy` |
+| `LastKnownLocationKey` | `LastKnownLocation` |
+| `HasHeardPlayerKey` | `HasHeardPlayer` (or leave `None` to disable hearing) |
+
+Tune `LostSightCooldown` (default `5 s`) and `LastKnownLocationRetention` (default `15 s`) to match your map scale.
+
+### 3. Configure `BTService_AIStateObserver` on the Combat Selector
 
 Wire each selector to the matching BB key name:
 
@@ -324,7 +429,7 @@ Wire each selector to the matching BB key name:
 | `TargetIsReloadingKey` | `TargetIsReloading` |
 | `TargetIsLowHealthKey` | `TargetIsLowHealth` |
 
-### 3. Configure `BTService_PeekWillingness` on the Combat Selector
+### 4. Configure `BTService_PeekWillingness` on the Combat Selector
 
 | Selector field | BB key to point at |
 |---|---|
@@ -339,16 +444,19 @@ Wire each selector to the matching BB key name:
 | `TargetIsLowHealthKey` | `TargetIsLowHealth` |
 | `PeekWillingnessScoreKey` | `PeekWillingnessScore` |
 
-### 4. Add Decorators to the Peek Sequence
+Leave `ScoreWriteDeadBand` at `0.02` unless you have a specific reason to change it (see the dead-band note in the service section above).
+
+### 5. Add Decorators to the Peek Sequence
 
 | Decorator | Key | Condition | Observer Aborts |
 |---|---|---|---|
 | Blackboard | `TargetEnemy` | Is Set | Both |
+| Blackboard | `HasSeenPlayer` | Is Set / == true | Both |
 | Blackboard | `PeekWillingnessScore` | Float >= `0.35` | Both |
 | Blackboard | `OutOfAmmo` | Is Not Set / == false | Self |
 | Blackboard | `HasTakenDamageRecently` | Is Not Set / == false | Self |
 
-### 5. Verify `BTT_ReleaseCoverSpot` fires on abort
+### 6. Verify `BTT_ReleaseCoverSpot` fires on abort
 
 In the BT editor, confirm the BP task fires when the **TAKE COVER** Sequence is interrupted — not only when it succeeds. The recommended pattern is an **On Abort** service or a **Decorator On Abort** that calls `ReleaseSpot(SelfActor)`. Without this, the `UMYSTCoverClaimSubsystem` will accumulate ghost claims for dead or fleeing AIs.
 
@@ -433,7 +541,7 @@ Sequence  [TAKE COVER]
 | **Aggressive** | `0.20` | Halve `RecentlyHitPenalty` and `LowSelfHealthPenalty` |
 | **Cowardly** | `0.55` | Double `RecentlyHitPenalty`; add +0.20 to `OutOfAmmoPenalty` |
 | **Flanker** | `0.25` | Increase `TargetDistractedBonus` to `0.35` |
-| **Sniper** | `0.40` | `MaxSteps = 1`, `StepSize = 200 cm` in `BTTask_FindPeekLocation` |
+| **Sniper** | `0.40` | `MaxSteps = 1`, `StepSize = 200 cm` in `UBTTask_FindPeekLocation` |
 
 To create a per-archetype variant: **subclass `BTService_PeekWillingness` in Blueprint**, override the weight defaults in Class Defaults. No C++ recompile needed.
 
@@ -441,7 +549,8 @@ To create a per-archetype variant: **subclass `BTService_PeekWillingness` in Blu
 
 | Service | Default interval | Reduce to… | Effect |
 |---|---|---|---|
-| `BTService_AIStateObserver` | 0.15 s | 0.08 s | `HasTakenDamageRecently` reacts < 1 frame faster |
+| `BTService_PlayerPerception` | 0.10 s | 0.05 s | Cooldown expiry checks run more frequently (detection is still instant via delegate) |
+| `BTService_AIStateObserver` | 0.15 s | 0.08 s | `OutOfAmmo` / `TargetIsReloading` tags polled faster; `HasTakenDamageRecently` arming is already instant |
 | `BTService_PeekWillingness` | 0.20 s | 0.10 s | Score updates snap to state changes more tightly |
 
 Higher intervals are cheaper on CPU-heavy encounters (many AIs); increase them for background/distant enemies.
@@ -463,7 +572,7 @@ Each claimed spot renders as an **orange sphere** with a **yellow line** to the 
 
 ### Blackboard monitor
 
-In PIE, open **Window → Behavior Tree Debugger** and select the AI pawn. Watch `PeekWillingnessScore` update in real time as you (the player) reload, step out of cover, or damage the AI.
+In PIE, open **Window → Behavior Tree Debugger** and select the AI pawn. Watch `PeekWillingnessScore`, `HasSeenPlayer`, and `HasHeardPlayer` update in real time as you (the player) reload, step out of cover, or damage the AI.
 
 ### Log tags
 
@@ -478,13 +587,131 @@ LogBehaviorTree=Verbose
 
 In PIE, with the player selected: **Gameplay Debugger** → `AbilitySystem` category (`'` key by default). Confirm `Event.Movement.Reload` appears in **Active Tags** while the player is reloading.
 
+### Check perception stimuli
+
+In PIE with the AI pawn selected, enable **Gameplay Debugger** → `Perception` category. Confirm the sight/hearing/damage senses show the expected sensed actors and stimulus ages. If `HasSeenPlayer` never arms, verify the player pawn has `UAIPerceptionStimuliSourceComponent` (or `bAutoRegisterAllPawnsAsSources` is on).
+
+---
+
+## Lifecycle & Safety
+
+This section documents the known lifetime hazards in every service, the fixes applied, and what to watch for when extending the code.
+
+### How the normal shutdown path works
+
+```
+PIE stop / level unload
+  └─► UWorld::BeginTearingDown()
+        └─► Actor::EndPlay (all actors)
+              └─► AI Controller: UnPossess / Destroy
+                    └─► UBehaviorTreeComponent::StopLogic
+                          └─► CeaseRelevantNodes
+                                └─► OnCeaseRelevant (each active service)
+                                      ├─ BTService_PlayerPerception → UnbindPerceptionDelegates()
+                                      └─ BTService_AIStateObserver  → UnbindHealthDelegate()
+```
+
+`OnCeaseRelevant` is the **primary** cleanup path and covers the common case. The fixes below harden the edge cases where that path is bypassed or races with in-flight callbacks.
+
+---
+
+### Bug 1 — `BTService_AIStateObserver::TickNode` — unchecked `GetWorld()` dereference *(crash)*
+
+**Was:**
+```cpp
+const float Elapsed = GetWorld()->GetTimeSeconds() - LastDamageTime;
+```
+`GetWorld()` can return `nullptr` on a `bCreateNodeInstance` UObject that outlives its outer world — a real scenario during PIE stop when GC ordering is non-deterministic. Dereferencing null is an instant crash.
+
+**Fix applied:** capture + null-check before use:
+```cpp
+UWorld* World = GetWorld();
+if (!World) { return; }
+const float Elapsed = World->GetTimeSeconds() - LastDamageTime;
+```
+
+---
+
+### Bug 2 — `BTService_AIStateObserver::OnAIHealthChanged` — `OnDamageDetected` fires outside the BT guard *(wrong behaviour)*
+
+**Was:**
+```cpp
+if (UBehaviorTreeComponent* BTComp = OwnerBTComp.Get())
+{
+    // ... write BB key ...
+}
+OnDamageDetected(DamageFraction);   // ← fires even when BTComp is null / BT stopped
+```
+When an AI pawn dies, `ULyraHealthComponent::OnHealthChanged` fires with the killing blow **before** the controller calls `StopLogic`. `OwnerBTComp` can be null or the BT can be mid-shutdown. The `OnDamageDetected` Blueprint event was reaching BP subclass logic in that incomplete state, making any BP code that accesses BB keys or the AI pawn unsafe.
+
+**Fix applied:** `OnDamageDetected` moved inside the `OwnerBTComp` guard. Two additional early-returns also added:
+```cpp
+if (NewValue <= 0.f) { return; }                        // skip the killing blow
+if (!World || World->IsTearingDown()) { return; }       // skip during world teardown
+```
+
+---
+
+### Bug 3 — Both delegate-binding services — no `BeginDestroy` override *(delegate leak / potential crash)*
+
+`BTService_PlayerPerception` binds to `UAIPerceptionComponent::OnTargetPerceptionUpdated`.  
+`BTService_AIStateObserver` binds to `ULyraHealthComponent::OnHealthChanged`.  
+Both use `bCreateNodeInstance = true` — each is a live `UObject` managed by the BT component.
+
+In an edge case (forced actor destroy, crash recovery, PIE stop that bypasses the normal BT shutdown), GC can collect the node UObject **before** `OnCeaseRelevant` fires. The source component then holds an `FScriptDelegate` whose target UObject has been destroyed. The next stimulus causes Unreal to iterate the multicast binding list and — in the best case — silently skips the stale entry (with a growing binding-list overhead); in the worst case it reaches the destroyed instance in a narrow timing window.
+
+**Fix applied:** `BeginDestroy()` override added to both services, calling the same idempotent `Unbind*()` helper that `OnCeaseRelevant` already uses:
+```cpp
+void UBTService_XXX::BeginDestroy()
+{
+    UnbindXDelegates();   // safe to call even if nothing is bound
+    Super::BeginDestroy();
+}
+```
+
+---
+
+### Bug 4 — `BTService_PlayerPerception::HandlePerceptionUpdated` — no `IsTearingDown` guard *(stale processing)*
+
+The perception system dispatches `OnTargetPerceptionUpdated` during `EndPlay` (e.g. sight-loss stimuli triggered by actors being destroyed). At that point `OwnerBTComp` is often still non-null, so the existing weak-pointer guard doesn't protect against writes to a shutting-down BB.
+
+**Fix applied:** explicit early-return at the top of `HandlePerceptionUpdated`:
+```cpp
+UWorld* World = GetWorld();
+if (!World || World->IsTearingDown()) { return; }
+```
+
+---
+
+### Issue 5 — `BTService_PeekWillingness` — placement-new with no matching destructor call *(future hygiene)*
+
+`InitializeMemory` allocates `FPeekWillingnessMemory` via placement `new`. The UE 5.7 `UBTNode` API does not expose a `CleanupMemory` virtual, so a matching destructor call cannot be added as an override in this version of the engine.
+
+`FPeekWillingnessMemory` currently holds only `bool bWasReady` and `float LastWrittenScore` — both trivially destructible, so there is **no actual leak today**.
+
+**What to do if you add non-trivial members** (e.g. `FTimerHandle`, `TArray`, `TWeakObjectPtr`):
+- Check whether the target UE version has added `virtual CleanupMemory(...)` to `UBTNode` and add the override then.
+- Otherwise, wrap non-trivial state in a sub-object held by the service itself (`bCreateNodeInstance = true` + member variable), rather than inside `FPeekWillingnessMemory`.
+
+---
+
+### Summary table
+
+| # | Service | Severity | Root cause | Fix |
+|---|---|---|---|---|
+| 1 | `AIStateObserver` | **Crash** | `GetWorld()` unchecked in `TickNode` | Captured + null-checked before use |
+| 2 | `AIStateObserver` | Wrong behaviour | `OnDamageDetected` outside BT guard | Moved inside guard; added dead-pawn + teardown returns |
+| 3 | `PlayerPerception` + `AIStateObserver` | Leak/crash risk | No `BeginDestroy` on `bCreateNodeInstance` UObjects | `BeginDestroy()` added to both; calls existing `Unbind*()` |
+| 4 | `PlayerPerception` | Stale processing | No `IsTearingDown` guard in perception delegate | Early-return added at top of `HandlePerceptionUpdated` |
+| 5 | `PeekWillingness` | Future hygiene | Placement-new; `CleanupMemory` virtual absent in UE 5.7 | Documented; no action needed while struct is all-POD |
+
 ---
 
 ## Extending the System
 
 ### Add a new scoring signal
 
-1. Write the new BB key from either `BTService_AIStateObserver` (if it needs GAS/health access) or directly from any other BT node.
+1. Write the new BB key from either `BTService_PlayerPerception` (if it needs perception data), `BTService_AIStateObserver` (if it needs GAS/health access), or directly from any other BT node.
 2. Add a `FBlackboardKeySelector` property and a weight float to `BTService_PeekWillingness`.
 3. Add one `if` branch in `UBTService_PeekWillingness::TickNode`.
 
@@ -496,3 +723,6 @@ In PIE, with the player selected: **Gameplay Debugger** → `AbilitySystem` cate
 
 If you want the AI to score on the *player's* reload even when the player is using a different ability, add `Event.Movement.Reload` to the appropriate `ActivationOwnedTags` in every reload variant GA (sniper, shotgun, etc.). `BTService_AIStateObserver` polls the tag regardless of which ability granted it.
 
+### Extend hearing to non-player sources
+
+Set `bOnlyDetectPlayers = false` on `BTService_PlayerPerception` and verify the hearing configs on the AI controller perception component. `HasHeardPlayer` (name is suggestive — rename the BB key if needed) will then arm on any noise maker.

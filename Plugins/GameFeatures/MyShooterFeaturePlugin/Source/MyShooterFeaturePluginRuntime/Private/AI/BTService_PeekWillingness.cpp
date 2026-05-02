@@ -68,6 +68,10 @@ uint16 UBTService_PeekWillingness::GetInstanceMemorySize() const
 void UBTService_PeekWillingness::InitializeMemory(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, EBTMemoryInit::Type InitType) const
 {
 	new (NodeMemory) FPeekWillingnessMemory();
+	// NOTE: FPeekWillingnessMemory is all-POD so no CleanupMemory override is
+	// needed today.  If non-trivial members are ever added (FTimerHandle,
+	// TArray, TWeakObjectPtr), add a CleanupMemory override that calls
+	// Memory->~FPeekWillingnessMemory() to avoid leaks on node deactivation.
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/LyraGameplayAbilityTargetData_SingleTargetHit.h"
 #include "DrawDebugHelpers.h"
+#include "Perception/AISense_Hearing.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraGameplayAbility_RangedWeapon)
 
@@ -237,7 +238,6 @@ FVector ULyraGameplayAbility_RangedWeapon::GetWeaponTargetingSourceLocation() co
 	check(AvatarPawn);
 
 	const FVector SourceLoc = AvatarPawn->GetActorLocation();
-	const FQuat SourceRot = AvatarPawn->GetActorQuat();
 
 	FVector TargetingSourceLocation = SourceLoc;
 
@@ -249,8 +249,6 @@ FVector ULyraGameplayAbility_RangedWeapon::GetWeaponTargetingSourceLocation() co
 FTransform ULyraGameplayAbility_RangedWeapon::GetTargetingTransform(APawn* SourcePawn, ELyraAbilityTargetingSource Source) const
 {
 	check(SourcePawn);
-	AController* SourcePawnController = SourcePawn->GetController(); 
-	ULyraWeaponStateComponent* WeaponStateComponent = (SourcePawnController != nullptr) ? SourcePawnController->FindComponentByClass<ULyraWeaponStateComponent>() : nullptr;
 
 	// The caller should determine the transform without calling this if the mode is custom!
 	check(Source != ELyraAbilityTargetingSource::Custom);
@@ -297,7 +295,7 @@ FTransform ULyraGameplayAbility_RangedWeapon::GetTargetingTransform(APawn* Sourc
 			FocalLoc = CamLoc + (AimDir * FocalDistance);
 		}
 		//Move the start to be the HeadPosition of the AI
-		else if (AAIController* AIController = Cast<AAIController>(Controller))
+		else if (Cast<AAIController>(Controller))
 		{
 			CamLoc = SourcePawn->GetActorLocation() + FVector(0, 0, SourcePawn->BaseEyeHeight);
 		}
@@ -438,7 +436,6 @@ void ULyraGameplayAbility_RangedWeapon::TraceBulletsInCartridge(const FRangedWea
 		const FVector BulletDir = VRandConeNormalDistribution(InputData.AimDir, HalfSpreadAngleInRadians, WeaponData->GetSpreadExponent());
 
 		const FVector EndTrace = InputData.StartTrace + (BulletDir * WeaponData->GetMaxDamageRange());
-		FVector HitLocation = EndTrace;
 
 		TArray<FHitResult> AllImpacts;
 
@@ -459,8 +456,6 @@ void ULyraGameplayAbility_RangedWeapon::TraceBulletsInCartridge(const FRangedWea
 			{
 				OutHits.Append(AllImpacts);
 			}
-
-			HitLocation = Impact.ImpactPoint;
 		}
 
 		// Make sure there's always an entry in OutHits so the direction can be used for tracers, etc...
@@ -520,7 +515,7 @@ void ULyraGameplayAbility_RangedWeapon::OnTargetDataReadyCallback(const FGamepla
 	UAbilitySystemComponent* MyAbilityComponent = CurrentActorInfo->AbilitySystemComponent.Get();
 	check(MyAbilityComponent);
 
-	if (const FGameplayAbilitySpec* AbilitySpec = MyAbilityComponent->FindAbilitySpecFromHandle(CurrentSpecHandle))
+	if (MyAbilityComponent->FindAbilitySpecFromHandle(CurrentSpecHandle))
 	{
 		FScopedPredictionWindow	ScopedPrediction(MyAbilityComponent);
 
@@ -532,8 +527,6 @@ void ULyraGameplayAbility_RangedWeapon::OnTargetDataReadyCallback(const FGamepla
 		{
 			MyAbilityComponent->CallServerSetReplicatedTargetData(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey(), LocalTargetDataHandle, ApplicationTag, MyAbilityComponent->ScopedPredictionKey);
 		}
-
-		const bool bIsTargetDataValid = true;
 
 		bool bProjectileWeapon = false;
 
@@ -559,7 +552,7 @@ void ULyraGameplayAbility_RangedWeapon::OnTargetDataReadyCallback(const FGamepla
 							}
 						}
 
-						WeaponStateComponent->ClientConfirmTargetData(LocalTargetDataHandle.UniqueId, bIsTargetDataValid, HitReplaces);
+						WeaponStateComponent->ClientConfirmTargetData(LocalTargetDataHandle.UniqueId, true, HitReplaces);
 					}
 
 				}
@@ -569,19 +562,46 @@ void ULyraGameplayAbility_RangedWeapon::OnTargetDataReadyCallback(const FGamepla
 
 
 		// See if we still have ammo
-		if (bIsTargetDataValid && CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
+		if (CommitAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo))
 		{
 			// We fired the weapon, add spread
 			ULyraRangedWeaponInstance* WeaponData = GetWeaponInstance();
 			check(WeaponData);
 			WeaponData->AddSpread();
 
+			// ── Report gunshot noise to the AI Perception System ────────────────
+			// UAISense_Hearing is entirely disconnected from the audio engine —
+			// PlaySoundAtLocation never reaches AI.  We must report the stimulus
+			// explicitly, server-side (authority), so all AI on the server hear it.
+			// ShotNoiseLoudness == 0 means the weapon is silenced / hearing disabled.
+#if WITH_SERVER_CODE
+			if (WeaponData->GetShotNoiseLoudness() > 0.f)
+			{
+				if (AActor* AvatarActor = GetAvatarActorFromActorInfo())
+				{
+					if (AController* Controller = GetControllerFromActorInfo())
+					{
+						if (Controller->GetLocalRole() == ROLE_Authority)
+						{
+							UAISense_Hearing::ReportNoiseEvent(
+								GetWorld(),
+								AvatarActor->GetActorLocation(),
+								WeaponData->GetShotNoiseLoudness(),
+								AvatarActor,
+								WeaponData->GetShotNoiseMaxRange(),
+								FName("Weapon.Shot"));
+						}
+					}
+				}
+			}
+#endif // WITH_SERVER_CODE
+
 			// Let the blueprint do stuff like apply effects to the targets
 			OnRangedWeaponTargetDataReady(LocalTargetDataHandle);
 		}
 		else
 		{
-			UE_LOG(LogLyraAbilitySystem, Warning, TEXT("Weapon ability %s failed to commit (bIsTargetDataValid=%d)"), *GetPathName(), bIsTargetDataValid ? 1 : 0);
+			UE_LOG(LogLyraAbilitySystem, Warning, TEXT("Weapon ability %s failed to commit"), *GetPathName());
 			K2_EndAbility();
 		}
 	}
@@ -628,8 +648,7 @@ void ULyraGameplayAbility_RangedWeapon::StartRangedWeaponTargeting()
 	}
 
 	// Send hit marker information
-	const bool bProjectileWeapon = false;
-	if (!bProjectileWeapon && (WeaponStateComponent != nullptr))
+	if (WeaponStateComponent != nullptr)
 	{
 		WeaponStateComponent->AddUnconfirmedServerSideHitMarkers(TargetData, FoundHits);
 	}
