@@ -49,11 +49,20 @@ public class MyShooterFeaturePluginRuntime : ModuleRules
 				// UGameplayMessageSubsystem used by UMYSTWeaponBarComponent broadcasts.
 				"GameplayMessageRuntime",
 				// UEnvQueryTest (UMYSTEnvQueryTest_ClaimedSpot), AAIController,
-			// UBTTaskNode, UBehaviorTreeComponent
-			"AIModule",
-			// UNavigationSystemV1::ProjectPointToNavigation (BTTask_FindPeekLocation)
-			"NavigationSystem",
-		}
+				// UBTTaskNode, UBehaviorTreeComponent
+				"AIModule",
+				// UNavigationSystemV1::ProjectPointToNavigation (BTTask_FindPeekLocation)
+				"NavigationSystem",
+				// ULoadingScreenManager + ILoadingProcessInterface (MYSTLevelLoadingSubsystem)
+				"CommonLoadingScreen",
+				// FShaderPipelineCache::NumPrecompilesRemaining() (MYSTLevelLoadingSubsystem)
+				"RenderCore",
+				// IMoviePlayer + FLoadingScreenAttributes — keeps Slate ticking during
+				// the synchronous LoadMap/FlushAsyncLoading block (MYSTLevelLoadingSubsystem)
+				"MoviePlayer",
+				// UWorldPartitionSubsystem header is part of the Engine module (already a public dep).
+				// No extra module needed.
+			}
 		);
 
 

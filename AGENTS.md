@@ -253,3 +253,55 @@ All code lives in `Plugins/GameFeatures/MyShooterFeaturePlugin/Source/MyShooterF
 - `ULyraEquipmentManagerComponent` and `ULyraEquipmentInstance` in `Source/LyraGame/Equipment/` were patched with `LYRAGAME_API` so the plugin can link against them. Do not remove these.
 - `GameplayMessageRuntime` was added to `PrivateDependencyModuleNames` in the plugin's `Build.cs`.
 
+---
+
+## MYST Level Loading system (custom)
+
+Single-player level loading flow that does **not** depend on Lyra's Experience system or online services.
+
+**Key file:** `Public/LevelLoading/MYSTLevelLoadingSubsystem.h` / `Private/LevelLoading/MYSTLevelLoadingSubsystem.cpp`
+
+### How it works
+
+`UMYSTLevelLoadingSubsystem` is a `UGameInstanceSubsystem` that:
+1. Implements `ILoadingProcessInterface` and registers itself with `ULoadingScreenManager` (from `CommonLoadingScreen` plugin).
+2. Shows the loading screen immediately when `RequestLevelTravel()` is called.
+3. Advances through a four-phase state machine, keeping the loading screen up until all gates clear:
+
+| Phase | Gate to advance |
+|---|---|
+| `WaitingForMap` | `FCoreUObjectDelegates::PostLoadMapWithWorld` fires |
+| `WaitingForStreaming` | All `ULevelStreaming` objects are loaded+visible (covers World Partition cells too) |
+| `WaitingForPSO` | `FShaderPipelineCache::NumPrecompilesRemaining() == 0` + `MinHoldAfterCompleteSeconds` |
+| `Idle` | Loading screen is hidden, gameplay begins |
+
+### Blueprint usage
+
+```
+GetGameInstance → Get Subsystem (MYSTLevelLoadingSubsystem)
+  → Bind OnLoadingComplete (optional)
+  → Bind OnShaderProgressUpdated → drive progress bar widget
+  → Call RequestLevelTravel("/Game/Maps/L_MyLevel", true)
+```
+
+### Blueprint-assignable events
+
+| Delegate | When |
+|---|---|
+| `OnLoadingStarted` | Right before `OpenLevel` is called |
+| `OnStreamingComplete` | All streaming levels/WP cells are visible |
+| `OnShadersComplete` | PSO precompile drained |
+| `OnShaderProgressUpdated(float, int32)` | Every tick during WaitingForPSO phase |
+| `OnLoadingComplete` | Loading screen about to hide — safe to start gameplay |
+
+### Tunable properties (set on the subsystem CDO or in BP)
+
+| Property | Default | Purpose |
+|---|---|---|
+| `PhaseTimeoutSeconds` | 30 s | Force-advances stuck phase and logs a warning |
+| `MinHoldAfterCompleteSeconds` | 0.25 s | Minimum hold after all gates clear (texture streaming catch-up) |
+
+### Build.cs additions
+- `CommonLoadingScreen` → `ILoadingProcessInterface`, `ULoadingScreenManager`
+- `RenderCore` → `FShaderPipelineCache`
+
