@@ -221,13 +221,20 @@ private:
 	FDelegateHandle PostLoadMapDelegateHandle;
 
 	/**
-	 * Deferred travel — stored so the one-frame timer callback can execute it.
-	 * OpenLevel is called on the NEXT tick after RegisterWithLoadingManager so
-	 * the loading screen widget gets at least one render frame before the game
-	 * thread is blocked by the level load.
+	 * Deferred travel — stored so the short timer callback can execute it.
+	 *
+	 * OpenLevel is intentionally delayed by ~0.15 s (≈9 frames @ 60fps) after
+	 * RegisterWithLoadingManager() so that ULoadingScreenManager has enough time
+	 * to complete its full show-screen pipeline:
+	 *   Frame N   – ShouldShowLoadingScreen() returns true for the first time.
+	 *   Frame N+1 – Manager.Tick() calls ShowLoadingScreen() and adds the Slate widget.
+	 *   Frame N+2 – Slate renders the widget (first visible frame).
+	 * Calling OpenLevel any sooner results in the game thread freezing before the
+	 * loading screen is visually on-screen, causing the 2-3 s black screen artefact.
 	 */
 	void ExecutePendingLevelTravel();
-	FString  PendingMapPath;
-	bool     bPendingAbsolute = true;
+	FString       PendingMapPath;
+	bool          bPendingAbsolute = true;
+	FTimerHandle  PendingTravelTimerHandle;
 };
 

@@ -199,14 +199,22 @@ void UMYSTLevelLoadingSubsystem::RequestLevelTravel(const FString& MapPath, bool
 	RegisterWithLoadingManager();
 	OnLoadingStarted.Broadcast();
 
-	// Defer OpenLevel by ONE tick so ULoadingScreenManager has a full frame to
-	// create and render its widget before the game thread is blocked by the
-	// level load (FlushAsyncLoading etc.). Without this the screen visibly
-	// freezes for several seconds before the loading screen ever appears.
+	// Defer OpenLevel by ~0.15 s so ULoadingScreenManager has enough frames to
+	// fully show the loading screen before the game thread is blocked by the
+	// synchronous level load (FlushAsyncLoading etc.).
+	//
+	// One tick is NOT sufficient: ULoadingScreenManager requires at least 3 frames
+	// to (1) evaluate ShouldShowLoadingScreen(), (2) call ShowLoadingScreen() and
+	// add the Slate widget, and (3) have Slate actually render it. Calling
+	// OpenLevel any sooner causes a 2-3 s black screen before the loading screen
+	// appears. 0.15 s (~9 frames @ 60 fps) gives a comfortable safety margin.
 	PendingMapPath   = MapPath;
 	bPendingAbsolute = bAbsolute;
-	GetGameInstance()->GetTimerManager().SetTimerForNextTick(
-		this, &UMYSTLevelLoadingSubsystem::ExecutePendingLevelTravel);
+	GetGameInstance()->GetTimerManager().SetTimer(
+		PendingTravelTimerHandle,
+		this, &UMYSTLevelLoadingSubsystem::ExecutePendingLevelTravel,
+		0.15f,
+		/*bLoop=*/false);
 }
 
 void UMYSTLevelLoadingSubsystem::ExecutePendingLevelTravel()
