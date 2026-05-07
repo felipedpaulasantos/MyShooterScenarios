@@ -305,3 +305,35 @@ GetGameInstance → Get Subsystem (MYSTLevelLoadingSubsystem)
 - `CommonLoadingScreen` → `ILoadingProcessInterface`, `ULoadingScreenManager`
 - `RenderCore` → `FShaderPipelineCache`
 
+---
+
+## MYST Shoot Dodge system (custom)
+
+Max Payne–style directional backwards dive with free upper-body aiming throughout.
+
+**Implementation guide:** `Docs/ShootDodge_ImplementationGuide.md`
+
+| Layer | What was built / configured | Key files |
+|---|---|---|
+| GAS | `GE_ShootDodge_Active` grants `Status.ShootDodge` tag for dive duration | `MyShooterFeaturePlugin/Content/Abilities/` |
+| GAS | `GA_ShootDodge` (BP) applies GE, sets `DiveStartYaw` on the AnimBP, removes GE on end | `MyShooterFeaturePlugin/Content/Abilities/` |
+| AnimBP | `GameplayTagPropertyMap` entry: `Status.ShootDodge` → `bIsShootDodging` | `ABP_Mannequin_Base` Class Defaults |
+| AnimBP | `CachedControlRotation` cached on game thread; `DiveYaw`/`DiveAimYaw`/`DiveAimPitch` computed thread-safely | `ABP_Mannequin_Base` Event Graph + Thread Safe Update |
+| AnimBP | `ShootDodge` state added to `LocomotionSM`; transitions on `bIsShootDodging` | `ABP_Mannequin_Base` → AnimGraph → LocomotionSM |
+| Animation | `BS_Diving_Backwards` BlendSpace (Yaw axis = dive direction); feeds `DiveStartYaw` | `MyShooterFeaturePlugin/Content/Animations/` |
+| Config | `Status.ShootDodge` tag registered | `Config/DefaultGameplayTags.ini` |
+
+**Gameplay tags used:**
+
+| Tag | Purpose |
+|---|---|
+| `Status.ShootDodge` | Active while diving; drives `bIsShootDodging` via `GameplayTagPropertyMap` |
+| `Ability.Type.Action.Dive` | Ability classification |
+| `InputTag.Ability.Dive` | Input binding |
+
+### Notes for future changes
+- `bUseControllerRotationYaw` is left **`true`** during the dive. The character mesh rotates with the camera; the BlendSpace selects the pose based on `DiveStartYaw` (yaw at dive start).
+- Upper-body weapon aim during the dive is handled automatically by `ABP_ItemAnimLayer_Base::FullBody_Aiming` (armed case) — no changes to the item layer needed for standard use.
+- When unarmed, `ABP_Mannequin_Base::FullBody_Aiming` is intentionally empty; the BlendSpace provides the full visible result.
+- If a weapon layer overrides the full body instead of doing a layered blend, add a `bIsShootDodging` pass-through branch at the top of `ABP_ItemAnimLayer_Base::FullBody_Aiming`.
+
