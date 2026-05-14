@@ -72,6 +72,15 @@ Apply Gameplay Effect to Owner  ──► GE_ShootDodge_Active
 GetOwningCharacter
   └─► GetMesh → GetAnimInstance → Cast to ABP_Mannequin_Base
         └─► SET DiveStartYaw = GetActorRotation.Yaw
+
+── Aim constraint (covers ShootDodge → Prone → GettingUp window) ──────
+Get Controller → Get Control Rotation → Break
+  ├─► Yaw   → SET AimConstraintCenterYaw   (on owning Character BP)
+  └─► Pitch → SET AimConstraintCenterPitch (on owning Character BP)
+SET bAimConstrained = true  (on owning Character BP)
+Get Player Camera Manager
+  ├─► SET ViewPitchMin = AimConstraintCenterPitch − AimConstraintRange
+  └─► SET ViewPitchMax = AimConstraintCenterPitch + AimConstraintRange
 ```
 
 **On `EndAbility`** (both committed and cancelled paths):
@@ -310,10 +319,14 @@ In **Class Defaults**: add entry `Status.ShootDodge` → `bIsShootDodging` (Bool
 - **`Event Blueprint Update Animation`** (game thread): cache `GetControlRotation()` → `CachedControlRotation`.
 - **`Blueprint Thread Safe Update Animation`** (worker thread): compute `DiveYaw`, `DiveAimYaw`, `DiveAimPitch` from `CachedControlRotation`.
 
-### 7. `LocomotionSM` — `ShootDodge` state
+### 7. `LocomotionSM` — `ShootDodge` + `Prone` states
 
-- Add state, wire enter/exit transitions on `bIsShootDodging`.
-- Inside state: `BlendSpace Player` (BS_Diving_Backwards, X = DiveStartYaw) → `Output Animation Pose`.
+- Add `ShootDodge` state; wire enter transition (`bIsShootDodging`) from ground states and exit transition (`NOT bIsShootDodging`) **to `Prone`** (not to Idle).
+- Add `Prone` state; wire exit transitions: `bHasMovementInput AND bProneOnBack` → `GettingUp_FromBack`, `bHasMovementInput AND NOT bProneOnBack` → `GettingUp_FromChest`.
+- In Character BP **BeginPlay**, cache the mesh's `StandingMeshOffsetZ` (−88). In `GA_ShootDodge` EndAbility, call `Mesh → SetRelativeLocation(0, 0, StandingMeshOffsetZ − ProneMeshDropAmount)` to ground the prone pose. In `GA_GettingUp` EndAbility, call `SetRelativeLocation(0, 0, StandingMeshOffsetZ)` to restore it.
+- Add `GettingUp_FromBack` and `GettingUp_FromChest` states; both exit to `Idle/Walk` on `Time Remaining (ratio) < 0.15`.
+- Inside `ShootDodge`: `BlendSpace Player` (BS_Diving_Backwards, X = DiveStartYaw, Loop = false) → `Output Animation Pose`.
+- Inside `Prone`: `BlendSpace Player` (BS_Prone_Directional, X = DiveYaw, Loop = false) → `Output Animation Pose`.
 
 ### 8. `BS_Diving_Backwards`
 
@@ -368,6 +381,387 @@ With `bUseControllerRotationYaw = true`, the actor yaw tracks the camera — the
 ### Why the BlendSpace lives in `LocomotionSM` and not in a separate montage slot
 
 Placing it in `LocomotionSM` means the existing linked layer chain (`FullBody_Aiming`, `FullBodyAdditives`, `FullBody_SkeletalControls`, `LeftHandPose_OverrideState`) applies after it automatically — upper-body weapon aim, IK, and left-hand grip work for free. A montage on a slot would require manually overriding or suppressing those layers.
+
+---
+
+## Prone State (post-dive landing)
+
+Max Payne 3–style: after the dive ends the character falls into a prone pose and stays there until the player pushes movement input.
+
+### New AnimBP variables (add to `ABP_Mannequin_Base`, mark Thread Safe)
+
+| Variable | Type | How it is set | Purpose |
+|---|---|---|---|
+| `bIsProne` | `bool` | Driven by state machine entry (or optional GAS tag) | Reserved for gameplay gating; not strictly required for animation-only prone |
+| `bHasMovementInput` | `bool` | Computed each frame in Thread Safe Update | `true` when the player is actively pushing the stick/WASD — the prone exit gate |
+| `bProneOnBack` | `bool` | Set once in `GA_ShootDodge` on activate (velocity dot product check) | Selects `GettingUp_FromBack` vs `GettingUp_FromChest` state |
+| `bSuppressFootIK` | `bool` | Set `true` in `GA_ShootDodge` ActivateAbility; `false` in `GA_GettingUp` EndAbility | Bypasses `FullBody_SkeletalControls` IK and Control Rig foot-plant during dive/prone/get-up |
+
+### Thread Safe Update — add this block
+
+```
+Property Access: CharacterMovement → CurrentAcceleration → VectorLength
+  └─► > 0.1 → SET bHasMovementInput
+```
+
+`CurrentAcceleration` is set by UE the instant input is applied, before velocity changes — it is the cleanest "intent to move" signal. It is safe to read via Property Access on the worker thread (struct copy, not a pointer chain).
+
+### State machine wiring
+
+Route the `ShootDodge` exit **to `Prone`** instead of directly to `Idle`:
+
+```
+[Any ground state] → ShootDodge    rule: bIsShootDodging
+[ShootDodge]       → Prone         rule: NOT bIsShootDodging   ← replaces old ShootDodge→Idle wire
+[Prone]            → Idle/Walk     rule: bHasMovementInput
+```
+
+**Transition blend settings:**
+
+| Transition | Cross-fade | Blend Logic |
+|---|---|---|
+| ShootDodge → Prone | `0.10 s` | Standard |
+| Prone → Idle/Walk | `0.20 s` | Standard |
+
+### `Prone` state contents
+
+```
+[Blend Space Player]
+  BlendSpace = BS_Prone_Directional
+  Yaw        ← GET DiveYaw   (reuse existing variable — direction relative to dive start)
+  Loop       = false          ← holds last frame while prone
+       │
+       ▼
+[Output Animation Pose]
+```
+
+Reusing `DiveYaw` aligns the prone direction with the preceding dive — no extra variables needed.
+
+### Suppressing foot IK during prone (fixes animation distortion)
+
+**Root cause:** The `FullBody_SkeletalControls` linked layer (and any Control Rig foot-plant node in the main AnimGraph) runs **after** `LocomotionSM`. It sees the prone feet positions, ray-casts them to the floor, and tries to plant them — mangling the pose. The `DisableLegIK` curve approach only works if the curve name exactly matches what the specific IK node reads; if not, it does nothing or activates something unrelated.
+
+**Reliable fix: add a `bSuppressFootIK` variable that bypasses the IK layer entirely.**
+
+#### Step 1 — New AnimBP variable
+
+Add to `ABP_Mannequin_Base`, mark **Thread Safe**:
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
+| `bSuppressFootIK` | `bool` | `false` | When `true`, passes the pose through `FullBody_SkeletalControls` and any Control Rig foot-plant node untouched |
+
+#### Step 2 — Drive it from the abilities
+
+**`GA_ShootDodge` → `ActivateAbility`** (alongside existing `DiveStartYaw` set):
+```
+GetOwningCharacter → GetMesh → GetAnimInstance → Cast to ABP_Mannequin_Base
+  └─► SET bSuppressFootIK = true
+```
+
+**`GA_GettingUp` → `EndAbility`** (alongside existing aim constraint restore):
+```
+GetOwningCharacter → GetMesh → GetAnimInstance → Cast to ABP_Mannequin_Base
+  └─► SET bSuppressFootIK = false
+```
+
+This covers the full `ShootDodge → Prone → GettingUp` window and restores IK cleanly when locomotion resumes.
+
+#### Step 3 — Bypass in `ABP_ItemAnimLayer_Base → FullBody_SkeletalControls`
+
+Open `ABP_ItemAnimLayer_Base`, find the **`FullBody_SkeletalControls`** function graph. Wrap all existing nodes with a branch at the very top:
+
+```
+[Input Pose]
+     │
+Property Access: Outer ABP → bSuppressFootIK
+  TRUE  → [Input Pose] ─────────────────────────────────────────► [Output Pose]  (full bypass)
+  FALSE → [Input Pose] → [existing Two Bone IK / Control Rig] → [Output Pose]  (normal IK)
+```
+
+The `Property Access` node can reach `bSuppressFootIK` on the outer `ABP_Mannequin_Base` from inside the linked layer — right-click → **Property Access** → navigate to the variable.
+
+#### Step 4 — Bypass the Control Rig foot-plant node (if present in the main AnimGraph)
+
+Open `ABP_Mannequin_Base` → main **AnimGraph**. If there is a **Control Rig** node (typically `CR_Mannequin_FootPlant` or similar) after the linked layer output:
+
+- Select the Control Rig node → find its **Alpha** input pin.
+- Wire: `NOT bSuppressFootIK` → cast to float (0.0 or 1.0) → **Alpha**
+
+Alpha = 0.0 passes the pose through unchanged. This is zero-cost when IK is suppressed.
+
+#### Finding the IK node in your specific setup
+
+If you're unsure whether foot IK lives in the linked layer or the main AnimGraph (or both):
+
+1. In PIE, open the **Anim Blueprint Debugger** (select character → **Window → Anim Blueprint Debugger**).
+2. Trigger prone so the distortion appears.
+3. Look for active nodes involving bones like `ik_foot_l`, `ik_foot_r`, `foot_l`, `foot_r` — those are the ones to bypass.
+
+> **Why not `DisableLegIK` curve:** Lyra 5.x foot IK is typically driven by `Enable_FootIK_R` / `Enable_FootIK_L` curves (1.0 = IK **on**, 0.0 = IK **off**) or by a Control Rig alpha pin — not `DisableLegIK`. Setting `DisableLegIK = 1.0` likely had no effect. The variable-driven bypass above is guaranteed to work regardless of curve naming.
+
+---
+
+### Prone mesh grounding (fixes floating above ground)
+
+**Why `SetActorLocation` fails here:** The Character Movement Component (CMC) repositions the actor every frame to keep the capsule bottom on the floor. Any manual Z drop is overridden before the next tick. Shrinking the capsule half-height alone leaves the capsule floating at mid-standing height until the CMC catches up, producing a visible pop.
+
+**Correct fix: shift the Skeletal Mesh component's relative Z**, not the actor. This is purely visual, bypasses the CMC entirely, and requires zero capsule changes.
+
+**New Character Blueprint variable:**
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
+| `ProneMeshDropAmount` | `float` | `44.0` | Units to drop the mesh below its normal standing offset during prone. Tune in PIE. |
+
+Cache the original mesh offset once in **BeginPlay** (or just hardcode `-88.0` if it never changes):
+```
+Get Mesh → Get Relative Location → Break → Z → SET StandingMeshOffsetZ   (stores −88)
+```
+
+**Enter prone** — add at the bottom of `GA_ShootDodge` `EndAbility` (both paths), after removing `GE_ShootDodge_Active`:
+
+```
+GetOwningCharacter → Get Mesh
+  └─► Set Relative Location (X=0, Y=0, Z = StandingMeshOffsetZ − ProneMeshDropAmount)
+                                      e.g.  −88 − 44 = −132
+```
+
+**Exit prone** — add at the bottom of `GA_GettingUp` `EndAbility`, alongside the existing aim constraint restore:
+
+```
+GetOwningCharacter → Get Mesh
+  └─► Set Relative Location (X=0, Y=0, Z = StandingMeshOffsetZ)   ← restore to −88
+```
+
+**Tuning `ProneMeshDropAmount` in PIE:**
+
+1. Play in editor, trigger the dive so the character enters Prone.
+2. Select the character → **Details** → **Mesh** → **Relative Location Z** — scrub the value live until the character's back is flush with the floor.
+3. The difference from `-88` is your `ProneMeshDropAmount`. Common range: `30–55` units.
+
+| Value | Result |
+|---|---|
+| Too small | Character still visibly floats above floor |
+| ~`44` (start here) | Body roughly at floor level for a standard mannequin prone pose |
+| Too large | Character sinks into the floor |
+
+> The capsule stays at standing height throughout prone. This is intentional — it keeps navigation and physics queries correct while the character is immobile on the ground. The visual discrepancy between capsule and mesh during prone is imperceptible in gameplay.
+
+### Get-up animation — two directional states
+
+The get-up sequence is selected based on whether the character fell on their **back** or **chest**, determined at dive activation time from the velocity direction.
+
+#### New AnimBP variable
+
+Add to `ABP_Mannequin_Base`, mark **Thread Safe**:
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
+| `bProneOnBack` | `bool` | `true` | Set in `GA_ShootDodge`; selects which get-up sequence to play |
+
+#### Set `bProneOnBack` in `GA_ShootDodge` on `ActivateAbility`
+
+Add immediately after setting `DiveStartYaw`:
+
+```
+GetOwningCharacter
+  ├─► GetVelocity → Normalize  ─┐
+  └─► GetActorForwardVector    ─┴─► DotProduct
+                                        │
+                              VectorLength(Velocity) > 10?
+                                YES → dot < 0? → TRUE  = bProneOnBack = true  (moving backward)
+                                               → FALSE = bProneOnBack = false (moving forward)
+                                NO  → bProneOnBack = true  (default: standing-still dodge)
+  └─► SET AnimBP.bProneOnBack
+```
+
+`DotProduct < 0` means the character is moving opposite to their forward vector (backing away) → lands on back. `≥ 0` = moving forward → lands on chest. The velocity-length guard prevents a zero-vector dot product from producing misleading results.
+
+#### State machine wiring
+
+Replace the single `GettingUp` state with two:
+
+```
+[Prone] ──(bHasMovementInput AND bProneOnBack)──────► [GettingUp_FromBack]  ──(Time Remaining < 0.15)──► [Idle/Walk]
+[Prone] ──(bHasMovementInput AND NOT bProneOnBack)──► [GettingUp_FromChest] ──(Time Remaining < 0.15)──► [Idle/Walk]
+```
+
+Set **Priority Order** on both Prone exit transitions (right-click arrow → Details → Priority Order: `1` for FromBack, `2` for FromChest) — the rules are mutually exclusive but explicit priority prevents editor ambiguity warnings.
+
+Neither `GettingUp` state has a back-transition — once entered, it always completes.
+
+**Transition blend settings:**
+
+| Transition | Cross-fade | Notes |
+|---|---|---|
+| Prone → GettingUp_FromBack | `0.10 s` | Quick cut into get-up start |
+| Prone → GettingUp_FromChest | `0.10 s` | Quick cut into get-up start |
+| GettingUp_FromBack → Idle/Walk | `0.20 s` | Smooth blend into locomotion |
+| GettingUp_FromChest → Idle/Walk | `0.20 s` | Smooth blend into locomotion |
+
+#### `GettingUp_FromBack` state contents
+
+```
+[Sequence Player]
+  Sequence = AM_GetUp_FromBack
+  Loop     = false
+       │
+       ▼
+[Output Animation Pose]
+```
+
+#### `GettingUp_FromChest` state contents
+
+```
+[Sequence Player]
+  Sequence = AM_GetUp_FromChest
+  Loop     = false
+       │
+       ▼
+[Output Animation Pose]
+```
+
+Use **Sequence Player** (not BlendSpace Player) in both — it exposes the time-remaining value the exit rule needs.
+
+#### Exit transition rule (same for both states)
+
+In each `GettingUp_* → Idle/Walk` transition rule graph:
+1. Right-click → search **"Time Remaining (ratio)"** → UE auto-binds it to the state's sequence.
+2. Wire: `Time Remaining (ratio) < 0.15` → **Result**
+
+`0.15` fires the transition when 15% of the animation remains, giving the `0.20 s` blend a clean overlap window. Adjust to taste:
+
+| Feel | Threshold |
+|---|---|
+| Very snappy | `0.05` |
+| Natural overlap (default) | `0.15` |
+| Early pre-blend | `0.25` |
+
+#### Blocking movement and abilities during get-up
+
+The state machine cannot set GAS tags directly. The bridge is: **Animation Notifies → Gameplay Events → `GA_GettingUp` ability**.
+
+**New Gameplay Tags** (add to `Config/DefaultGameplayTags.ini`):
+
+```ini
++GameplayTagList=(Tag="Status.GettingUp",DevComment="Active during get-up animation. Blocks movement and abilities.")
++GameplayTagList=(Tag="Event.Animation.GettingUp.Begin",DevComment="Sent by anim notify at start of get-up sequence.")
++GameplayTagList=(Tag="Event.Animation.GettingUp.End",DevComment="Sent by anim notify at end of get-up sequence.")
+```
+
+**Animation Notifies on both `AM_GetUp_FromBack` and `AM_GetUp_FromChest`:**
+
+Add two point `AnimNotify` events in the Notifies track:
+
+| Position | Notify | Action |
+|---|---|---|
+| Frame 0 | Blueprint Anim Notify | `Send Gameplay Event to Actor` → `Event.Animation.GettingUp.Begin` |
+| Last frame − 2 | Blueprint Anim Notify | `Send Gameplay Event to Actor` → `Event.Animation.GettingUp.End` |
+
+Inside each notify Blueprint:
+```
+Received_Notify(MeshComp, Animation)
+  └─► MeshComp → Get Owner → Cast to LyraCharacter
+        └─► Get Ability System Component
+              └─► Send Gameplay Event to Actor
+                    Actor    = owning actor
+                    EventTag = Event.Animation.GettingUp.Begin  (or .End)
+                    Payload  = default
+```
+
+**`GE_GettingUp_Active`** (new Blueprint Gameplay Effect):
+
+| Property | Value |
+|---|---|
+| Duration Policy | `Infinite` (removed manually) |
+| Granted Tags → Added | `Status.GettingUp` |
+| Stacking | None |
+
+**`GA_GettingUp`** (new Blueprint Gameplay Ability):
+
+- **Ability Trigger:** Tag = `Event.Animation.GettingUp.Begin`, Source = `GameplayEvent`
+- **Activation Owned Tags:** `Status.GettingUp`
+
+On `ActivateAbility`:
+```
+Apply Gameplay Effect to Self  ──► GE_GettingUp_Active
+  └─► store GettingUpEffectHandle
+
+Wait Gameplay Event  (Tag = Event.Animation.GettingUp.End, OnlyTriggerOnce = true)
+  └─► Remove Active Gameplay Effect with Handle  ──► GettingUpEffectHandle
+        └─► End Ability
+```
+
+Grant `GA_GettingUp` in the same ability set as `GA_ShootDodge`.
+
+Before the `End Ability` node in `GA_GettingUp`, also **restore aim constraints**:
+
+```
+SET bAimConstrained = false  (on owning Character BP)
+Get Player Camera Manager
+  ├─► SET ViewPitchMin = -89.9   (UE default)
+  └─► SET ViewPitchMax =  89.9   (UE default)
+```
+
+**Block movement input** — in the Character Blueprint, listen to the ASC tag count:
+
+```
+BeginPlay → Get ASC → Add Gameplay Tag Count Changed Delegate (Status.GettingUp)
+  Count > 0  → Get Player Controller → Set Ignore Move Input (true)
+  Count == 0 → Get Player Controller → Set Ignore Move Input (false)
+```
+
+`SetIgnoreMoveInput` uses an internal stack counter — the `true`/`false` pair stacks safely with other systems. Do **not** use `Reset Ignore Move Input`; that clears the whole stack regardless of who pushed it.
+
+The character will still slide to a stop under friction, gravity continues to apply, and the camera remains freely aimable — only directional steering input is suppressed.
+
+**Aim rotation constraint** — new Character Blueprint variables:
+
+| Variable | Type | Default | Purpose |
+|---|---|---|---|
+| `bAimConstrained` | `bool` | `false` | Enables per-tick yaw clamp |
+| `AimConstraintCenterYaw` | `float` | `0.0` | Control yaw captured at dive start |
+| `AimConstraintCenterPitch` | `float` | `0.0` | Control pitch captured at dive start |
+| `AimConstraintRange` | `float` | `45.0` | Half-angle limit in degrees |
+
+`bAimConstrained` is set to `true` in `GA_ShootDodge` on `ActivateAbility` and `false` in `GA_GettingUp` on `EndAbility`, so it covers the full `ShootDodge → Prone → GettingUp` window automatically.
+
+Pitch is constrained via `PlayerCameraManager.ViewPitchMin/Max` (set in `GA_ShootDodge`, restored in `GA_GettingUp`) — engine-enforced, no tick needed.
+
+Yaw is constrained by a lightweight `Event Tick` branch in the Character Blueprint:
+
+```
+[Event Tick]
+  Is bAimConstrained?
+    FALSE → skip (zero cost)
+    TRUE  →
+      Get Controller Rotation → Break → Yaw (CurrentYaw)
+      Delta = NormalizeAngle(CurrentYaw − AimConstraintCenterYaw)
+      Is |Delta| > AimConstraintRange?
+        FALSE → no correction
+        TRUE  →
+          ClampedYaw = AimConstraintCenterYaw + (Sign(Delta) × AimConstraintRange)
+          Get Controller → Set Control Rotation (Pitch=current, Yaw=ClampedYaw, Roll=0)
+```
+
+> `PlayerCameraManager.ViewYawMin/Max` also exists but clamps to absolute world-space values and doesn't handle the 360° seam cleanly when the reference angle is near ±180°. The per-tick correction avoids this entirely.
+
+**Block abilities** — on every ability that must be suppressed during get-up (e.g. `GA_ShootDodge`, jump, fire), add `Status.GettingUp` to its **Activation Blocked Tags** in Class Defaults.
+
+### Optional: `Status.Prone` Gameplay Tag
+
+If prone needs gameplay consequences (block jumping, reduce speed, gate abilities):
+
+1. Add to `Config/DefaultGameplayTags.ini`:
+   ```ini
+   +GameplayTagList=(Tag="Status.Prone",DevComment="Applied when character is in the prone state after ShootDodge landing.")
+   ```
+2. At the end of `GA_ShootDodge` (after removing `GE_ShootDodge_Active`), apply `GE_Prone_Active` (Infinite, grants `Status.Prone`).
+3. Remove `GE_Prone_Active` when the player exits prone — via an Animation Notify at the end of the get-up animation, or via a separate `GA_ExitProne` that waits on `bHasMovementInput` using a `WaitGameplayEvent` or a tick-based check.
+4. Add `Status.Prone` → `bIsProne` to the `GameplayTagPropertyMap` in `ABP_Mannequin_Base` Class Defaults.
+
+For animation-only prone with no gameplay gating, skip this entirely — `bHasMovementInput` alone is sufficient.
 
 ---
 
