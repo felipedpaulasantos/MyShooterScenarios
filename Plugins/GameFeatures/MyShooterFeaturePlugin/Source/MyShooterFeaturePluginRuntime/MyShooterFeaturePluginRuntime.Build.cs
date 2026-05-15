@@ -62,6 +62,13 @@ public class MyShooterFeaturePluginRuntime : ModuleRules
 				"MoviePlayer",
 				// UWorldPartitionSubsystem header is part of the Engine module (already a public dep).
 				// No extra module needed.
+				// UAimAssistInputModifier + FAimAssistSettings (MYSTAimAssistSettingsSubsystem)
+				"ShooterCoreRuntime",
+				// UEnhancedPlayerInput, UEnhancedInputLocalPlayerSubsystem (MYSTAimAssistSettingsSubsystem)
+				"EnhancedInput",
+				// LyraSettingsShared.h includes SubtitleDisplayOptions.h from GameSubtitles,
+				// which is a Private dep of LyraGame and therefore not transitive to this plugin.
+				"GameSubtitles",
 			}
 		);
 

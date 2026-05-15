@@ -51,6 +51,22 @@ enum class ELyraGamepadSensitivity : uint8
 	MAX				UMETA(Hidden),
 };
 
+/**
+ * Aim assist strength preset for gamepad players.
+ * Actual per-preset values live in UMYSTAimAssistPresetsDataAsset and are
+ * applied at runtime by UMYSTAimAssistSettingsSubsystem.
+ */
+UENUM(BlueprintType)
+enum class EMYSTAimAssistPreset : uint8
+{
+	Disabled  UMETA(DisplayName = "Disabled"),
+	Low       UMETA(DisplayName = "Low"),
+	Moderate  UMETA(DisplayName = "Moderate"),
+	Strong    UMETA(DisplayName = "Strong"),
+
+	MAX       UMETA(Hidden),
+};
+
 class ULyraLocalPlayer;
 
 /**
@@ -343,6 +359,26 @@ public:
 	void SetGamepadTargetingSensitivityPreset(ELyraGamepadSensitivity NewValue) { ChangeValueAndDirty(GamepadTargetingSensitivityPreset, NewValue); ApplyInputSensitivity(); }
 
 	void ApplyInputSensitivity();
+
+	////////////////////////////////////////////////////////
+	// Aim Assist (Gamepad)
+public:
+	/** Returns the currently stored aim assist strength preset. */
+	UFUNCTION()
+	EMYSTAimAssistPreset GetAimAssistPreset() const { return AimAssistPreset; }
+
+	/**
+	 * Stores the new aim assist preset and broadcasts OnSettingChanged.
+	 * UMYSTAimAssistSettingsSubsystem listens to OnSettingChanged and applies the
+	 * matching values from UMYSTAimAssistPresetsDataAsset to the live modifier.
+	 */
+	UFUNCTION()
+	void SetAimAssistPreset(EMYSTAimAssistPreset NewValue) { ChangeValueAndDirty(AimAssistPreset, NewValue); }
+
+private:
+	/** Stored aim assist preset, saved with the user's profile. Default = Moderate. */
+	UPROPERTY()
+	EMYSTAimAssistPreset AimAssistPreset = EMYSTAimAssistPreset::Moderate;
 	
 private:
 	UPROPERTY()

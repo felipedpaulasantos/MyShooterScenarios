@@ -551,28 +551,34 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 		}
 		else
 		{
-			// Stick ativo: o tempo da curva continua subindo (independente da direção)
-			// para evitar micro-trancos quando o jogador gira o stick em círculo.
 			const FVector2D Direction = RawValue / Magnitude;
-			LookStickPrevDirection = Direction;
 
+			// Side-switch detection: if the new stick direction is opposed to the previous one
+			// (dot product < 0), the player has flipped sides — reset the ramp-up state so
+			// speed builds from scratch again (Destiny / Max Payne style).
+			if (!LookStickPrevDirection.IsZero() && FVector2D::DotProduct(LookStickPrevDirection, Direction) < 0.0f)
+			{
+				LookStickTimeSinceEngaged = 0.0f;
+				LookStickCurrentMultiplier = 0.0f;
+			}
+
+			LookStickPrevDirection = Direction;
 			LookStickTimeSinceEngaged += DeltaTime;
 
-			// Curve X = tempo (s), Y = multiplicador alvo base.
+			// Curve X = time (s), Y = base target multiplier.
+			// The curve provides the intended ramp shape; do not add a second ramp via FInterpTo.
 			const float TimeCurveValue = FMath::Max(0.0f, LookStickAccelerationCurve->GetFloatValue(LookStickTimeSinceEngaged));
 
-			// Fator baseado na magnitude do stick: quanto mais próximo de 1, mais próximo do valor da curva.
-			// - Em Magnitude=1 -> MagnitudeFactor=1 (usa o valor cheio da curva)
-			// - Em Magnitude=0.2 -> MagnitudeFactor~0.25 (ramp-up bem mais lento)
-			// Ajuste o expoente se quiser mais/menos sensibilidade.
+			// Scale by stick magnitude: full deflection (1.0) → full curve value.
+			// Adjust the exponent to taste (1.5 gives a gentle compression at partial deflection).
 			const float MagnitudeFactor = FMath::Pow(Magnitude, 1.5f);
 
 			const float TargetMultiplier = TimeCurveValue * MagnitudeFactor;
 
-			const float PrevMultiplier = LookStickCurrentMultiplier;
-			// Ramp-up base; será efetivamente mais rápido para magnitudes altas
-			// porque TargetMultiplier sobe mais rápido.
-			const float RampUpSpeed = 2.0f;
+			// FInterpTo here is a light smoothing layer only — not a second ramp.
+			// Speed 8.0 makes the multiplier track the curve closely so the curve
+			// alone dictates the ramp-up profile, fixing the "too slow initial response".
+			const float RampUpSpeed = 8.0f;
 			LookStickCurrentMultiplier = FMath::FInterpTo(LookStickCurrentMultiplier, TargetMultiplier, DeltaTime, RampUpSpeed);
 
 			Value = RawValue * LookStickCurrentMultiplier;

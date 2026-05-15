@@ -184,6 +184,41 @@ UGameSettingCollection* ULyraGameSettingRegistry::InitializeGamepadSettings(ULyr
 		//----------------------------------------------------------------------------------
 	}
 
+	// Aim Assist
+	////////////////////////////////////////////////////////////////////////////////////
+	{
+		UGameSettingCollection* AimAssistCollection = NewObject<UGameSettingCollection>();
+		AimAssistCollection->SetDevName(TEXT("AimAssistCollection"));
+		AimAssistCollection->SetDisplayName(LOCTEXT("AimAssistCollection_Name", "Aim Assist"));
+		Screen->AddSetting(AimAssistCollection);
+
+		//----------------------------------------------------------------------------------
+		{
+			UGameSettingValueDiscreteDynamic_Enum* Setting = NewObject<UGameSettingValueDiscreteDynamic_Enum>();
+			Setting->SetDevName(TEXT("AimAssistPreset"));
+			Setting->SetDisplayName(LOCTEXT("AimAssistPreset_Name", "Aim Assist Strength"));
+			Setting->SetDescriptionRichText(LOCTEXT("AimAssistPreset_Description",
+				"Controls how strongly the camera is pulled toward and slows down on targets when using a gamepad.\n"
+				"<Disabled> No assist — full manual control.\n"
+				"<Low> Subtle guidance for experienced players.\n"
+				"<Moderate> Balanced and smooth — recommended for most players.\n"
+				"<Strong> Aggressive assist, good for new players.\n"
+				"Has no effect with mouse & keyboard."));
+
+			Setting->SetDynamicGetter(GET_SHARED_SETTINGS_FUNCTION_PATH(GetAimAssistPreset));
+			Setting->SetDynamicSetter(GET_SHARED_SETTINGS_FUNCTION_PATH(SetAimAssistPreset));
+			Setting->SetDefaultValue(GetDefault<ULyraSettingsShared>()->GetAimAssistPreset());
+
+			Setting->AddEnumOption(EMYSTAimAssistPreset::Disabled, LOCTEXT("AimAssist_Disabled", "Disabled"));
+			Setting->AddEnumOption(EMYSTAimAssistPreset::Low,      LOCTEXT("AimAssist_Low",      "Low"));
+			Setting->AddEnumOption(EMYSTAimAssistPreset::Moderate, LOCTEXT("AimAssist_Moderate", "Moderate"));
+			Setting->AddEnumOption(EMYSTAimAssistPreset::Strong,   LOCTEXT("AimAssist_Strong",   "Strong"));
+
+			AimAssistCollection->AddSetting(Setting);
+		}
+		//----------------------------------------------------------------------------------
+	}
+
 	// Dead Zone
 	////////////////////////////////////////////////////////////////////////////////////
 	{
