@@ -248,14 +248,23 @@ void ALyraCharacter::PossessedBy(AController* NewController)
 					{
 						if (ULyraPawnExtensionComponent* PawnExtCompLocal = ULyraPawnExtensionComponent::FindPawnExtensionComponent(this))
 						{
-							PawnExtCompLocal->InitializeAbilitySystem(LyraASC, LyraPS);
-
-							// Clear any lingering input state or input-blocking tags from previous avatars so
-							// that ability-input-driven abilities work correctly after a repossess.
-							LyraASC->ClearAbilityInput();
-							if (LyraASC->HasMatchingGameplayTag(TAG_Gameplay_AbilityInputBlocked))
+							// Only reinitialize immediately if PawnData has already been set.
+							// bAllowRepossess is intended for RE-possession of a previously initialized
+							// pawn (e.g. respawn reuse). If PawnData is still null the Experience hasn't
+							// loaded yet, so we skip this early path and let the normal init-state
+							// machine (CheckDefaultInitialization) wire everything up once the
+							// Experience calls SetPawnData().
+							if (PawnExtCompLocal->GetPawnData<ULyraPawnData>() != nullptr)
 							{
-								LyraASC->RemoveDynamicTagGameplayEffect(TAG_Gameplay_AbilityInputBlocked);
+								PawnExtCompLocal->InitializeAbilitySystem(LyraASC, LyraPS);
+
+								// Clear any lingering input state or input-blocking tags from previous avatars so
+								// that ability-input-driven abilities work correctly after a repossess.
+								LyraASC->ClearAbilityInput();
+								if (LyraASC->HasMatchingGameplayTag(TAG_Gameplay_AbilityInputBlocked))
+								{
+									LyraASC->RemoveDynamicTagGameplayEffect(TAG_Gameplay_AbilityInputBlocked);
+								}
 							}
 						}
 					}

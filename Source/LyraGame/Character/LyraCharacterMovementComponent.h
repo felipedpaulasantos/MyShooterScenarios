@@ -66,9 +66,63 @@ public:
 	virtual float GetMaxSpeed() const override;
 	//~End of UMovementComponent interface
 
+	// --- Cover Mode constant ---
+public:
+	/** Index used for MOVE_Custom when in cover. Matches the entry in CustomMovementModeTagMap. */
+	static constexpr uint8 COVER_CUSTOM_MODE = 0;
+
+	// --- Cover mode API ---
+public:
+	/**
+	 * Enters cover mode using the provided wall hit result.
+	 * Stores surface data once; PhysCustom uses it every step.
+	 * The perpendicular distance to the wall is derived from the hit result automatically.
+	 * @param WallHit   The initial hit result from the cover detection trace/overlap.
+	 * @param MaxSpeed  Lateral movement speed along cover (cm/s).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Lyra|CharacterMovement|Cover")
+	void EnterCoverMode(const FHitResult& WallHit, float MaxSpeed);
+
+	/** Exits cover mode and restores MOVE_Walking. */
+	UFUNCTION(BlueprintCallable, Category = "Lyra|CharacterMovement|Cover")
+	void ExitCoverMode();
+
+	/** Returns true if currently in the cover custom movement mode. */
+	UFUNCTION(BlueprintPure, Category = "Lyra|CharacterMovement|Cover")
+	bool IsInCoverMode() const;
+
+	// --- Cover state (readable from BP for lean/edge traces) ---
+public:
+	/** Wall surface normal, captured once on EnterCoverMode. */
+	UPROPERTY(BlueprintReadOnly, Transient, Category = "Cover State")
+	FVector CoverSurfaceNormal = FVector::ZeroVector;
+
+	/**
+	 * Lateral axis along the wall surface.
+	 * Computed as Cross(UpVector, CoverSurfaceNormal) on entry.
+	 * Use this as the trace direction for lean/edge detection instead of shoulder sockets.
+	 */
+	UPROPERTY(BlueprintReadOnly, Transient, Category = "Cover State")
+	FVector CoverSurfaceTangent = FVector::ZeroVector;
+
+	/** Target perpendicular distance from wall surface (cm). */
+	UPROPERTY(BlueprintReadOnly, Transient, Category = "Cover State")
+	float CoverDistanceFromWall = 50.0f;
+
+	/** Maximum lateral speed while in cover (cm/s). */
+	UPROPERTY(BlueprintReadOnly, Transient, Category = "Cover State")
+	float CoverMaxMoveSpeed = 250.0f;
+
+	/** The primitive component whose surface we are attached to. Used to validate wall snaps. */
+	UPROPERTY(BlueprintReadOnly, Transient, Category = "Cover State")
+	TObjectPtr<UPrimitiveComponent> CoverComponent = nullptr;
+
 protected:
 
 	virtual void InitializeComponent() override;
+
+	// --- CMC overrides ---
+	virtual void PhysCustom(float DeltaTime, int32 Iterations) override;
 
 protected:
 

@@ -55,6 +55,9 @@ namespace LyraGameplayTags
 	// When extending Lyra, you can create your own movement modes but you need to update GetCustomMovementModeTagMap()
 	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Movement_Mode_Custom, "Movement.Mode.Custom", "This is invalid and should be replaced with custom tags.  See LyraGameplayTags::CustomMovementModeTagMap.");
 
+	// Cover custom movement mode (COVER_CUSTOM_MODE = 0)
+	UE_DEFINE_GAMEPLAY_TAG_COMMENT(Movement_Mode_Cover, "Movement.Mode.Cover", "Character is hugging cover.");
+
 	// Unreal Movement Modes
 	const TMap<uint8, FGameplayTag> MovementModeTagMap =
 	{
@@ -69,7 +72,7 @@ namespace LyraGameplayTags
 	// Custom Movement Modes
 	const TMap<uint8, FGameplayTag> CustomMovementModeTagMap =
 	{
-		// Fill these in with your custom modes
+		{ 0, Movement_Mode_Cover }   // COVER_CUSTOM_MODE = 0
 	};
 
 	FGameplayTag FindTagByString(const FString& TagString, bool bMatchPartialString)
