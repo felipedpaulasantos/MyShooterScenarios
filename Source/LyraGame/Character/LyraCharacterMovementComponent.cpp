@@ -148,6 +148,12 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
 		return;
 	}
 
+	// Only allow entering cover while grounded — block if falling, swimming, flying, etc.
+	if (MovementMode != MOVE_Walking)
+	{
+		return;
+	}
+
 	// Overlap events do not populate HitResult.Normal — it arrives as (0,0,0).
 	// When that happens, fire a short line trace from the character toward the
 	// overlapping component to recover a valid surface normal.

@@ -307,6 +307,39 @@ GetGameInstance → Get Subsystem (MYSTLevelLoadingSubsystem)
 
 ---
 
+## MYST Car Chase / Treadmill system (custom)
+
+Actor-based "infinite road" treadmill for a constant-speed car chase level.
+
+**Key files** (all in `Plugins/GameFeatures/MyShooterFeaturePlugin/Source/MyShooterFeaturePluginRuntime/`):
+
+| File | Purpose |
+|---|---|
+| `Public/CarChase/MYSTChunkDefinition.h` | `UMYSTChunkDefinition` — `UPrimaryDataAsset` describing one road segment template (chunk class, length, spawn weight, enemy count). Create one asset per unique segment type. |
+| `Public/CarChase/AMYSTRoadChunkActor.h` | `AMYSTRoadChunkActor` — Abstract base actor for all road segments. Subclass in Blueprint to add meshes/enemies/VFX. Exposes `K2_OnChunkActivated`, `K2_OnChunkDeactivated`, `NotifyEnemyKilled`, `NotifyEnemySpawned`. |
+| `Public/CarChase/AMYSTChaseTrackManager.h` | `AMYSTChaseTrackManager` — Place in the level, maintains a sliding window of chunk actors. Auto-ticks, recycles trailing chunks, spawns ahead, tracks enemy kill count. |
+| `Private/CarChase/AMYSTChaseTrackManager.cpp` | Manager implementation (weighted random pool, pawn-projected travel distance, state machine). |
+| `Private/CarChase/AMYSTRoadChunkActor.cpp` | Chunk actor implementation. |
+| `Private/CarChase/MYSTChunkDefinition.cpp` | Data asset helper (`GetDisplayName`). |
+
+### State machine (`EMYSTChaseState`)
+`Idle → Running → Finishing → Complete` (or `→ Stopped` via `StopChase()`).
+
+### Enemy accounting flow
+1. `DA_ChunkDef.ExpectedEnemyCount` → auto-added to total when chunk spawns.
+2. `NotifyEnemySpawned()` on chunk actor → for dynamic/variable counts.
+3. `NotifyEnemyKilled()` on chunk actor → decrements; triggers `K2_OnAllEnemiesDefeated` + `Finishing` state when all done.
+4. `ForceFinish()` on manager → skips enemy accounting entirely.
+
+### Setup quick reference (Blueprint)
+1. Place `B_ChaseTrackManager` (BP child of `AMYSTChaseTrackManager`) in the level, facing the travel direction.
+2. Populate `ChunkPool` with `UMYSTChunkDefinition` assets.
+3. Optionally assign `EndChunkDefinition`.
+4. Leave `TrackedPawn` null (auto-grabs first player pawn) or set it explicitly.
+5. Enable `bAutoStartOnBeginPlay` or call `StartChase()` from Blueprint.
+
+---
+
 ## MYST Shoot Dodge system (custom)
 
 Max Payne–style directional backwards dive with free upper-body aiming throughout.
