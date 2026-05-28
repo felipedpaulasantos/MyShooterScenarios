@@ -4,6 +4,7 @@
 
 #include "Components/ActorComponent.h"
 #include "Character/LyraBlockHealthInterface.h"
+#include "GameplayEffect.h"
 
 #include "LyraBlockHealthLogicComponent.generated.h"
 
@@ -50,6 +51,28 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Lyra|Health|Blocks")
 	FLyraBlockHealthLogic_BlocksChanged OnBlocksChanged;
 
+	/**
+	 * Immunity window in seconds after a block of damage is consumed.
+	 * Any damage events arriving within this window are neutralized (health snapped back)
+	 * rather than removing another block. Prevents shotgun pellets from each consuming
+	 * a separate block in the same volley. Set to 0 to disable.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Health|Blocks", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float ImmunityWindowSeconds = 0.2f;
+
+	/**
+	 * Optional GameplayEffect to apply to the owner when a block of damage is consumed.
+	 * Intended for brief player invincibility (iframes) so the player can reposition
+	 * after taking a hit. The GE duration governs how long invincibility lasts.
+	 *
+	 * Leave null to disable. Applied server-side only; replication is handled by GAS.
+	 *
+	 * NOTE: Remove the GE trigger from your GameplayCue once this is set — the cue
+	 * should remain cosmetic-only (screen flash, sound). The mechanic lives here.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Health|Blocks")
+	TSubclassOf<UGameplayEffect> OnBlockConsumedInvincibilityEffect;
+
 	/** Optional: set health to full blocks on BeginPlay/when found (useful if you want always-multiple-of-block). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Lyra|Health|Blocks")
 	bool bQuantizeOnBeginPlay = true;
@@ -95,10 +118,16 @@ protected:
 
 	void ApplyQuantizedHealthIfNeeded(float OldHealth, float NewHealth);
 
+	/** Applies OnBlockConsumedInvincibilityEffect to the owner's ASC. Called when a block is consumed. */
+	void ApplyInvincibilityEffect();
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<ULyraHealthComponent> HealthComponent;
 
 	bool bApplyingQuantization = false;
+
+	/** World time (seconds) when the last block of damage was consumed. Used for the immunity window. */
+	float LastBlockDamageTime = -1.0f;
 };
 

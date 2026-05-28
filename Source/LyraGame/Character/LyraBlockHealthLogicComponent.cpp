@@ -264,13 +264,42 @@ void ULyraBlockHealthLogicComponent::ApplyQuantizedHealthIfNeeded(float OldHealt
 
 	if (bIsDamage)
 	{
-		const float DamageAmount = ClampedOld - ClampedNew;
-		const int32 DamageBlocks = (DamageAmount <= TwoBlockDamageThreshold) ? 1 : 2;
-		const int32 ClampedDamageBlocks = FMath::Clamp(DamageBlocks, 1, FMath::Max(1, MaxDamageBlocksPerHit));
+		// --- Immunity window check ---
+		// After a block is consumed, ignore damage events that arrive within ImmunityWindowSeconds.
+		// This prevents shotgun pellets (many rapid hits in one volley) from each removing a block.
+		const UWorld* World = GetWorld();
+		const float CurrentTime = World ? World->GetTimeSeconds() : -1.0f;
+		const bool bInImmunityWindow = (ImmunityWindowSeconds > 0.0f)
+			&& (LastBlockDamageTime >= 0.0f)
+			&& (CurrentTime - LastBlockDamageTime < ImmunityWindowSeconds);
 
-		const int32 OldBlocks = HealthToBlocks_RoundUp(ClampedOld);
-		const int32 NewBlocks = FMath::Max(0, OldBlocks - ClampedDamageBlocks);
-		QuantizedTargetHealth = FMath::Clamp(BlocksToHealth(NewBlocks), 0.0f, MaxHealth);
+		if (bInImmunityWindow)
+		{
+			// Snap health back to the current block boundary - neutralize this hit.
+			const int32 CurrentBlocks = HealthToBlocks_RoundUp(ClampedOld);
+			QuantizedTargetHealth = FMath::Clamp(BlocksToHealth(CurrentBlocks), 0.0f, MaxHealth);
+
+			UE_LOG(LogLyraBlockHealthLogic, Verbose,
+				TEXT("ApplyQuantizedHealthIfNeeded: immunity window active (%.3fs remaining) for '%s' - damage neutralized"),
+				ImmunityWindowSeconds - (CurrentTime - LastBlockDamageTime), *GetNameSafe(Owner));
+		}
+		else
+		{
+			const float DamageAmount = ClampedOld - ClampedNew;
+			const int32 DamageBlocks = (DamageAmount <= TwoBlockDamageThreshold) ? 1 : 2;
+			const int32 ClampedDamageBlocks = FMath::Clamp(DamageBlocks, 1, FMath::Max(1, MaxDamageBlocksPerHit));
+
+			const int32 OldBlocks = HealthToBlocks_RoundUp(ClampedOld);
+			const int32 NewBlocks = FMath::Max(0, OldBlocks - ClampedDamageBlocks);
+			QuantizedTargetHealth = FMath::Clamp(BlocksToHealth(NewBlocks), 0.0f, MaxHealth);
+
+			// Record the time we consumed a block so the immunity window starts now.
+			LastBlockDamageTime = CurrentTime;
+
+			// Apply the optional invincibility GE (iframes). This is the proper place for
+			// the mechanic — keep the GameplayCue cosmetic-only (screen flash, sound).
+			ApplyInvincibilityEffect();
+		}
 	}
 	else
 	{
@@ -308,3 +337,39 @@ void ULyraBlockHealthLogicComponent::ApplyQuantizedHealthIfNeeded(float OldHealt
 	ASC->SetNumericAttributeBase(ULyraHealthSet::GetHealthAttribute(), QuantizedTargetHealth);
 	bApplyingQuantization = false;
 }
+
+void ULyraBlockHealthLogicComponent::ApplyInvincibilityEffect()
+{
+	if (!OnBlockConsumedInvincibilityEffect)
+	{
+		return;
+	}
+
+	ULyraAbilitySystemComponent* ASC = GetLyraASC();
+	if (!ASC)
+	{
+		return;
+	}
+
+	AActor* Owner = GetOwner();
+	if (!Owner || !Owner->HasAuthority())
+	{
+		return;
+	}
+
+	FGameplayEffectContextHandle ContextHandle = ASC->MakeEffectContext();
+	ContextHandle.AddSourceObject(this);
+
+	const FGameplayEffectSpecHandle SpecHandle = ASC->MakeOutgoingSpec(
+		OnBlockConsumedInvincibilityEffect, /*Level=*/ 1.0f, ContextHandle);
+
+	if (SpecHandle.IsValid())
+	{
+		ASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+
+		UE_LOG(LogLyraBlockHealthLogic, Verbose,
+			TEXT("ApplyInvincibilityEffect: applied '%s' to '%s'"),
+			*GetNameSafe(OnBlockConsumedInvincibilityEffect), *GetNameSafe(Owner));
+	}
+}
+
