@@ -100,6 +100,10 @@ void ULyraHealthComponent::UninitializeFromAbilitySystem()
 
 	HealthSet = nullptr;
 	AbilitySystemComponent = nullptr;
+
+	// Reset death state so that if this component (or a reused pawn via bAllowRepossess)
+	// is re-initialized, StartDeath() is not silently skipped by the NotDead guard.
+	DeathState = ELyraDeathState::NotDead;
 }
 
 void ULyraHealthComponent::ClearGameplayTags()

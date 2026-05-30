@@ -77,6 +77,14 @@ void ULyraAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AAc
 
 	if (bHasNewPawnAvatar)
 	{
+		// Reset activation-group counts whenever a new pawn avatar takes over.
+		// This is a safety net against leaked Exclusive_Blocking counts from a
+		// previous pawn's death ability that could not be cancelled normally
+		// (e.g. when bSinglePlayerDeathRules = false on the death ability).
+		// It is safe in both SP and MP: by the time a new pawn avatar is assigned,
+		// the old pawn's abilities should already have been torn down.
+		ResetActivationGroupCounts();
+
 		// When we are switching to a new pawn avatar (including repossess flows),
 		// clear any cached input state so we don't keep handles from a previous avatar.
 		ClearAbilityInput();
@@ -499,6 +507,11 @@ void ULyraAbilitySystemComponent::RemoveAbilityFromActivationGroup(ELyraAbilityA
 	check(ActivationGroupCounts[(uint8)Group] > 0);
 
 	ActivationGroupCounts[(uint8)Group]--;
+}
+
+void ULyraAbilitySystemComponent::ResetActivationGroupCounts()
+{
+	FMemory::Memset(ActivationGroupCounts, 0, sizeof(ActivationGroupCounts));
 }
 
 void ULyraAbilitySystemComponent::CancelActivationGroupAbilities(ELyraAbilityActivationGroup Group, ULyraGameplayAbility* IgnoreLyraAbility, bool bReplicateCancelAbility)

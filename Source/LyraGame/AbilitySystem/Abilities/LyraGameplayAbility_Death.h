@@ -45,4 +45,17 @@ protected:
 	// If enabled, the ability will automatically call StartDeath.  FinishDeath is always called when the ability ends if the death was started.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lyra|Death")
 	bool bAutoStartDeath;
+
+	/**
+	 * When true (default), use singleplayer-friendly death rules:
+	 *   - The ability remains cancellable so that UninitializeAbilitySystem can properly
+	 *     end it and decrement the Exclusive_Blocking activation-group count.
+	 *     Without this, the count leaks into the next pawn, blocking all exclusive
+	 *     abilities and causing T-pose / blocked input after respawn.
+	 *
+	 * Set to false to restore the original multiplayer behaviour where SetCanBeCanceled(false)
+	 * prevents the server from prematurely cancelling a client's death mid-animation.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lyra|Death")
+	bool bSinglePlayerDeathRules = true;
 };

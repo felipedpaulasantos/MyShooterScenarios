@@ -178,6 +178,12 @@ void ULyraPawnExtensionComponent::UninitializeAbilitySystem()
 		}
 		PawnAbilitySetHandles.Reset();
 
+		// Reset activation-group counts after removing ability sets.
+		// Any non-cancellable ability (e.g. the death ability with bSinglePlayerDeathRules=false)
+		// may have left an Exclusive_Blocking count that CancelAbilities() above could not
+		// decrement.  Zeroing here prevents that count from leaking into the next pawn.
+		AbilitySystemComponent->ResetActivationGroupCounts();
+
 		if (AbilitySystemComponent->GetOwnerActor() != nullptr)
 		{
 			AbilitySystemComponent->SetAvatarActor(nullptr);

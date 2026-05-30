@@ -41,11 +41,18 @@ void ULyraGameplayAbility_Death::ActivateAbility(const FGameplayAbilitySpecHandl
 	// Cancel all abilities and block others from starting.
 	LyraASC->CancelAbilities(nullptr, &AbilityTypesToIgnore, this);
 
-	SetCanBeCanceled(false);
-
 	if (!ChangeActivationGroup(ELyraAbilityActivationGroup::Exclusive_Blocking))
 	{
 		UE_LOG(LogLyraAbilitySystem, Error, TEXT("ULyraGameplayAbility_Death::ActivateAbility: Ability [%s] failed to change activation group to blocking."), *GetName());
+	}
+
+	// In singleplayer rules the ability stays cancellable so that UninitializeAbilitySystem
+	// can properly end it via CancelAbilities(), which decrements ActivationGroupCounts.
+	// In multiplayer mode we keep SetCanBeCanceled(false) to prevent the server from
+	// interrupting a client's death animation mid-sequence.
+	if (!bSinglePlayerDeathRules)
+	{
+		SetCanBeCanceled(false);
 	}
 
 	if (bAutoStartDeath)

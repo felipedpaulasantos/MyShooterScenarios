@@ -60,6 +60,16 @@ public:
 	void RemoveAbilityFromActivationGroup(ELyraAbilityActivationGroup Group, ULyraGameplayAbility* LyraAbility);
 	void CancelActivationGroupAbilities(ELyraAbilityActivationGroup Group, ULyraGameplayAbility* IgnoreLyraAbility, bool bReplicateCancelAbility);
 
+	/**
+	 * Resets all activation-group counts to zero.
+	 *
+	 * Called whenever a new pawn avatar is assigned (InitAbilityActorInfo) and during
+	 * UninitializeAbilitySystem, so that a leaked Exclusive_Blocking count from a
+	 * non-cancellable ability (e.g. a multiplayer-configured death ability) never
+	 * carries over into the next pawn's ability activation checks.
+	 */
+	void ResetActivationGroupCounts();
+
 	// Uses a gameplay effect to add the specified dynamic granted tag.
 	void AddDynamicTagGameplayEffect(const FGameplayTag& Tag);
 
