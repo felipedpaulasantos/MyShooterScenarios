@@ -21,6 +21,8 @@
 #include "Camera/LyraCameraMode.h"
 #include "InputMappingContext.h"
 #include "Misc/UObjectToken.h"
+#include "Engine/GameInstance.h"
+#include "Subsystems/GameInstanceSubsystem.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(LyraHeroComponent)
 
@@ -305,6 +307,36 @@ void ULyraHeroComponent::InitializePlayerInput(UInputComponent* PlayerInputCompo
 
 	// Allow Blueprint subclasses to extend input initialization after the default Lyra bindings are in place.
 	OnInitializePlayerInput(PlayerInputComponent);
+
+	// Re-apply the aim assist preset after input bindings are rebuilt.
+	// Enhanced Input recreates modifier instances on every InitializePlayerInput call, so the
+	// preset values must be pushed again here.
+	// We resolve UMYSTAimAssistSettingsSubsystem dynamically to avoid a circular module
+	// dependency (MyShooterFeaturePluginRuntime already lists LyraGame as a public dep).
+	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
+	{
+		static UClass* AimAssistSubsystemClass = nullptr;
+		if (!AimAssistSubsystemClass)
+		{
+			AimAssistSubsystemClass = FindObject<UClass>(nullptr,
+				TEXT("/Script/MyShooterFeaturePluginRuntime.MYSTAimAssistSettingsSubsystem"));
+		}
+		if (AimAssistSubsystemClass)
+		{
+			if (UGameInstanceSubsystem* AimAssistSub = GI->GetSubsystemBase(AimAssistSubsystemClass))
+			{
+				static UFunction* ApplyFn = nullptr;
+				if (!ApplyFn)
+				{
+					ApplyFn = AimAssistSubsystemClass->FindFunctionByName(TEXT("ApplyCurrentPreset"));
+				}
+				if (ApplyFn)
+				{
+					AimAssistSub->ProcessEvent(ApplyFn, nullptr);
+				}
+			}
+		}
+	}
 
 	// Mark that inputs have been bound; in reuse/repossess flows this may be called more than once,
 	// so avoid asserting on repeated initialization.
