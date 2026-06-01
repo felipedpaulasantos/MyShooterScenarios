@@ -192,6 +192,39 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
 		}
 	}
 
+	// -----------------------------------------------------------------------
+	// Surface width check — reject if the wall is narrower than the
+	// character's back (~60 units).  Probe ±RequiredHalfWidth along the wall
+	// tangent from the impact point; if either side finds no wall, or a
+	// significantly different surface normal (e.g. a corner / thin edge),
+	// the surface is too small to hide behind.
+	// -----------------------------------------------------------------------
+	{
+		constexpr float RequiredHalfWidth = 30.0f;  // half of 60-unit minimum
+		const FVector LocalTangent = FVector::CrossProduct(FVector::UpVector, ResolvedNormal).GetSafeNormal();
+
+		const FVector ProbeOrigins[2] = {
+			ResolvedImpactPoint - LocalTangent * RequiredHalfWidth,
+			ResolvedImpactPoint + LocalTangent * RequiredHalfWidth
+		};
+
+		for (const FVector& ProbeOrigin : ProbeOrigins)
+		{
+			// Trace through the wall plane at this offset point.
+			const FVector ProbeStart = ProbeOrigin + ResolvedNormal * 80.0f;
+			const FVector ProbeEnd   = ProbeOrigin - ResolvedNormal * 80.0f;
+
+			FCollisionQueryParams ProbeParams(SCENE_QUERY_STAT(EnterCoverWidthCheck), false, CharacterOwner);
+			FHitResult ProbeHit;
+			if (!GetWorld()->LineTraceSingleByChannel(ProbeHit, ProbeStart, ProbeEnd, ECC_Visibility, ProbeParams)
+				|| FVector::DotProduct(ProbeHit.Normal, ResolvedNormal) < 0.7f)
+			{
+				// Surface edge or corner within required width — too narrow.
+				return;
+			}
+		}
+	}
+
 	// Store surface data — never updated from animations.
 	CoverSurfaceNormal  = ResolvedNormal;
 	CoverSurfaceTangent = FVector::CrossProduct(FVector::UpVector, ResolvedNormal).GetSafeNormal();
@@ -226,6 +259,18 @@ void ULyraCharacterMovementComponent::ExitCoverMode()
 bool ULyraCharacterMovementComponent::IsInCoverMode() const
 {
 	return MovementMode == MOVE_Custom && CustomMovementMode == COVER_CUSTOM_MODE;
+}
+
+bool ULyraCharacterMovementComponent::CanCrouchInCurrentState() const
+{
+	// Cover mode is a grounded state — keep crouching legal so the engine's
+	// UpdateCharacterStateBeforeMovement doesn't force-uncrouch every tick
+	// (base impl returns false for any MOVE_Custom mode).
+	if (IsInCoverMode())
+	{
+		return CanEverCrouch() && UpdatedComponent && !UpdatedComponent->IsSimulatingPhysics();
+	}
+	return Super::CanCrouchInCurrentState();
 }
 
 void ULyraCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterations)
@@ -292,16 +337,56 @@ void ULyraCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iteratio
 	}
 
 	// -----------------------------------------------------------------------
-	// 3. GRAVITY + FLOOR: integrate Z velocity and sweep downward so the
-	//    character stays grounded without reimplementing PhysWalking.
+	// 3. FLOOR SNAP — cover is always a grounded mode.
+	// Sweep the full capsule straight down and snap to the floor in one frame.
+	// This replaces gradual gravity accumulation, which causes a multi-frame
+	// slow-float whenever the capsule is resized (e.g. crouching while in
+	// cover) because MOVE_Custom has no PhysWalking instant floor-snap logic.
+	// Gravity is used only as a fallback when no walkable floor is found
+	// (e.g. the character walks off a ledge and cover is about to be lost).
 	// -----------------------------------------------------------------------
-	const float PrevVelZ = Velocity.Z;
-	Velocity.Z += GetGravityZ() * DeltaTime;
-	const float AvgVelZ  = 0.5f * (PrevVelZ + Velocity.Z);
-	const float ZDelta   = AvgVelZ * DeltaTime;
+	const UCapsuleComponent* CapsuleComp = CharacterOwner->GetCapsuleComponent();
+	check(CapsuleComp);
+
+	const FCollisionShape SnapCapsule = FCollisionShape::MakeCapsule(
+		CapsuleComp->GetScaledCapsuleRadius(),
+		CapsuleComp->GetScaledCapsuleHalfHeight());
+
+	// 150 cm probe: covers the max standing→crouched capsule resize (~25 cm)
+	// plus a comfortable margin for steps and slight airborne cases.
+	const FVector SnapStart = FVector(TargetXY.X, TargetXY.Y, CurrentLocation.Z);
+	const FVector SnapEnd   = SnapStart - FVector(0.f, 0.f, 150.f);
+
+	FCollisionQueryParams SnapQueryParams(SCENE_QUERY_STAT(CoverPhysFloorSnap), false, CharacterOwner);
+	FCollisionResponseParams SnapResponseParams;
+	InitCollisionParams(SnapQueryParams, SnapResponseParams);
+
+	FHitResult FloorSnapHit;
+	const bool bFoundWalkableFloor = GetWorld()->SweepSingleByChannel(
+		FloorSnapHit, SnapStart, SnapEnd, FQuat::Identity,
+		UpdatedComponent->GetCollisionObjectType(),
+		SnapCapsule, SnapQueryParams, SnapResponseParams);
+
+	float ZDelta;
+	if (bFoundWalkableFloor && FloorSnapHit.bBlockingHit
+		&& !FloorSnapHit.bStartPenetrating
+		&& FloorSnapHit.Normal.Z >= GetWalkableFloorZ())
+	{
+		// Snap directly to the floor — single-frame, no multi-frame settling.
+		ZDelta     = -FloorSnapHit.Distance;
+		Velocity.Z = 0.0f;
+	}
+	else
+	{
+		// No walkable floor within probe range — fall via gravity so the character
+		// can drop off ledges naturally when cover geometry ends.
+		const float PrevVelZ = Velocity.Z;
+		Velocity.Z += GetGravityZ() * DeltaTime;
+		ZDelta = 0.5f * (PrevVelZ + Velocity.Z) * DeltaTime;
+	}
 
 	// -----------------------------------------------------------------------
-	// 4. MOVE: apply the combined XY snap + Z gravity in one swept move.
+	// 4. MOVE: apply the combined XY snap + Z correction in one swept move.
 	// -----------------------------------------------------------------------
 	const FVector MoveDelta = (TargetXY - CurrentLocation) + FVector(0.0f, 0.0f, ZDelta);
 

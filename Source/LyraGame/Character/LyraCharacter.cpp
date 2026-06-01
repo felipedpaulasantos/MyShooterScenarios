@@ -508,8 +508,11 @@ void ALyraCharacter::ToggleCrouch()
 	{
 		UnCrouch();
 	}
-	else if (LyraMoveComp->IsMovingOnGround())
+	else if (LyraMoveComp->IsMovingOnGround() || LyraMoveComp->IsInCoverMode())
 	{
+		// IsMovingOnGround() returns false in MOVE_Custom, so cover mode needs
+		// its own explicit check here — CanCrouchInCurrentState() on the CMC
+		// already permits it, this just lets the request through.
 		Crouch();
 	}
 }

@@ -542,11 +542,16 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 
 	FVector2D Value = RawValue;
 
+	// Use real (undilated) delta time so gamepad look is immune to time dilation
+	// (e.g. bullet-time / slow-mo effects).  Frame-rate independence is preserved;
+	// only deliberate game-world time scaling is ignored, matching mouse look behaviour.
+	const float RealDeltaTime = FApp::GetDeltaTime();
+
 	// Time + magnitude-based acceleration for gamepad look.
 	if (LookStickAccelerationCurve)
 	{
 		const float Magnitude = RawValue.Size();
-		const float DeltaTime = World->GetDeltaSeconds();
+		const float DeltaTime = RealDeltaTime;
 
 		// Deadzone "forte" para considerar o stick realmente parado.
 		constexpr float StickDeadZone = 0.10f;
@@ -625,16 +630,14 @@ void ULyraHeroComponent::Input_LookStick(const FInputActionValue& InputActionVal
 	// sem alterar o comportamento existente quando a força de suavização é zero.
 	FVector2D FinalValue = Value;
 
-	const float DeltaTime = World->GetDeltaSeconds();
-	
 	if (FinalValue.X != 0.0f)
 	{
-		Pawn->AddControllerYawInput(FinalValue.X * LyraHero::LookYawRate * DeltaTime);
+		Pawn->AddControllerYawInput(FinalValue.X * LyraHero::LookYawRate * RealDeltaTime);
 	}
 
 	if (FinalValue.Y != 0.0f)
 	{
-		Pawn->AddControllerPitchInput(FinalValue.Y * LyraHero::LookPitchRate * DeltaTime);
+		Pawn->AddControllerPitchInput(FinalValue.Y * LyraHero::LookPitchRate * RealDeltaTime);
 	}
 }
 void ULyraHeroComponent::Input_Crouch(const FInputActionValue& InputActionValue)

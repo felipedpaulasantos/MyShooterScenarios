@@ -91,6 +91,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Lyra|CharacterMovement|Cover")
 	bool IsInCoverMode() const;
 
+	/**
+	 * Cover mode is a grounded state, so crouching must remain allowed while
+	 * inside it.  Without this override the base implementation returns false
+	 * for any MOVE_Custom mode (not walking/falling), causing the engine's
+	 * UpdateCharacterStateBeforeMovement to force-uncrouch every tick.
+	 */
+	virtual bool CanCrouchInCurrentState() const override;
+
 	// --- Cover state (readable from BP for lean/edge traces) ---
 public:
 	/** Wall surface normal, captured once on EnterCoverMode. */
