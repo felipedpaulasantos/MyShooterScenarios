@@ -504,7 +504,21 @@ void ULyraAbilitySystemComponent::AddAbilityToActivationGroup(ELyraAbilityActiva
 void ULyraAbilitySystemComponent::RemoveAbilityFromActivationGroup(ELyraAbilityActivationGroup Group, ULyraGameplayAbility* LyraAbility)
 {
 	check(LyraAbility);
-	check(ActivationGroupCounts[(uint8)Group] > 0);
+
+	// Use ensureMsgf instead of check so that we get a warning in Development builds
+	// rather than a hard crash.  This count can legitimately be 0 during world teardown
+	// (e.g. on map reload) if ResetActivationGroupCounts() was called from
+	// UninitializeAbilitySystem() before a GameFeatureAction-granted PlayerState ability
+	// had its EndAbility routed through NotifyAbilityEnded.  Early-returning is safe here
+	// because we are in teardown and the exclusive-ability blocking semantics no longer matter.
+	if (!ensureMsgf(ActivationGroupCounts[(uint8)Group] > 0,
+		TEXT("RemoveAbilityFromActivationGroup: ActivationGroupCounts[%d] is already 0 for ability '%s'. "
+			 "This usually means ResetActivationGroupCounts() was called while the ability was still active "
+			 "(common on map reload when pawn teardown races against PlayerState teardown)."),
+		(uint8)Group, *GetNameSafe(LyraAbility)))
+	{
+		return;
+	}
 
 	ActivationGroupCounts[(uint8)Group]--;
 }

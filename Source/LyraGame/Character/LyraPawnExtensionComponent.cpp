@@ -178,10 +178,23 @@ void ULyraPawnExtensionComponent::UninitializeAbilitySystem()
 		}
 		PawnAbilitySetHandles.Reset();
 
-		// Reset activation-group counts after removing ability sets.
-		// Any non-cancellable ability (e.g. the death ability with bSinglePlayerDeathRules=false)
-		// may have left an Exclusive_Blocking count that CancelAbilities() above could not
-		// decrement.  Zeroing here prevents that count from leaking into the next pawn.
+		// Cancel ALL remaining active abilities (including SurvivesDeath ones that the filtered
+		// CancelAbilities call above skipped).  This ensures every active ability decrements its
+		// own ActivationGroupCounts entry via NotifyAbilityEnded *before* we call
+		// ResetActivationGroupCounts below.
+		//
+		// Without this, abilities granted by UGameFeatureAction_AddAbilities to the *PlayerState*
+		// (not the pawn) could still have active instances at this point.  Their counts live in the
+		// same ActivationGroupCounts array on the ASC (which lives on the PlayerState).  If we
+		// zero the array now and those abilities are later force-ended during PlayerState teardown
+		// (map reload), RemoveAbilityFromActivationGroup would see a count of 0 and either assert
+		// or log an ensure failure.
+		AbilitySystemComponent->CancelAbilities(nullptr, nullptr);
+
+		// Reset activation-group counts after all active abilities have been cancelled.
+		// This is a final safety net that clears any truly non-cancellable / leaked counts
+		// (e.g. a death ability that could not be cancelled) so they do not bleed into
+		// the next pawn assignment on the same ASC.
 		AbilitySystemComponent->ResetActivationGroupCounts();
 
 		if (AbilitySystemComponent->GetOwnerActor() != nullptr)
