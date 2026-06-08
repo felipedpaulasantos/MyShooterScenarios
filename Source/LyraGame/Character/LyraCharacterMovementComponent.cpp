@@ -235,7 +235,32 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
 	CoverDistanceFromWall = FVector::DotProduct(
 		CharacterOwner->GetActorLocation() - ResolvedImpactPoint, ResolvedNormal);
 
-	// Rotate character to face away from the cover wall.
+	// -----------------------------------------------------------------------
+	// ENTRY POSITION CORRECTION
+	// If the character approached the wall at an angle the capsule may be at
+	// the wrong perpendicular distance.  Project the current XY location onto
+	// the wall plane and place the character exactly CoverDistanceFromWall away.
+	// This eliminates the one-frame positional jitter on sideways entries.
+	// -----------------------------------------------------------------------
+	{
+		const FVector CharLoc       = CharacterOwner->GetActorLocation();
+		const float   CurrentPerp   = FVector::DotProduct(CharLoc - ResolvedImpactPoint, ResolvedNormal);
+		const float   PerpError     = CurrentPerp - CoverDistanceFromWall;
+		const FVector CorrectedLoc  = CharLoc - ResolvedNormal * PerpError;
+		CharacterOwner->SetActorLocation(CorrectedLoc, false, nullptr, ETeleportType::TeleportPhysics);
+	}
+
+	// -----------------------------------------------------------------------
+	// ROTATION LOCK SETUP
+	// Disable controller-yaw so the camera can rotate freely while PhysCustom
+	// enforces the wall-perpendicular yaw each tick.  Cached so ExitCoverMode
+	// can restore the original value rather than hard-coding true/false.
+	// -----------------------------------------------------------------------
+	bCachedControllerRotationYaw         = CharacterOwner->bUseControllerRotationYaw;
+	CharacterOwner->bUseControllerRotationYaw = false;
+
+	// Snap rotation immediately so the character's back faces the wall on the
+	// exact frame cover mode is entered (PhysCustom enforces it every tick after).
 	const FRotator FaceAwayFromWall = UKismetMathLibrary::MakeRotFromX(-CoverSurfaceNormal);
 	CharacterOwner->SetActorRotation(FaceAwayFromWall);
 
@@ -246,6 +271,12 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
 
 void ULyraCharacterMovementComponent::ExitCoverMode()
 {
+	// Restore controller-yaw rotation to whatever it was before cover was entered.
+	if (CharacterOwner)
+	{
+		CharacterOwner->bUseControllerRotationYaw = bCachedControllerRotationYaw;
+	}
+
 	CoverSurfaceNormal    = FVector::ZeroVector;
 	CoverSurfaceTangent   = FVector::ZeroVector;
 	CoverDistanceFromWall = 50.0f;
@@ -405,6 +436,45 @@ void ULyraCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iteratio
 
 		// Let the character slide along walls/corners without exiting cover.
 		SlideAlongSurface(MoveDelta, 1.0f - MoveHit.Time, MoveHit.Normal, MoveHit, true);
+	}
+
+	// -----------------------------------------------------------------------
+	// 5. ROTATION LOCK: enforce wall-perpendicular yaw every tick.
+	//    CoverSurfaceNormal is already refreshed from the live wall trace above
+	//    (step 2), so curved surfaces are handled automatically.
+	//    Only Yaw is forced — Pitch and Roll remain at their CMC defaults (0).
+	//
+	//    EXCEPTION: skip the lock when ADSing or leaning — in those states the
+	//    character needs to rotate freely with the camera for aiming.
+	// -----------------------------------------------------------------------
+	if (CharacterOwner && !CoverSurfaceNormal.IsNearlyZero())
+	{
+		bool bShouldLockYaw = true;
+
+		// Check for ADS or lean tags — if any are present, allow free rotation.
+		if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(CharacterOwner))
+		{
+			const FGameplayTag ADS_Tag          = FGameplayTag::RequestGameplayTag(FName("Event.Movement.ADS"));
+			const FGameplayTag Lean_Generic_Tag = FGameplayTag::RequestGameplayTag(FName("Status.Cover.CanLean"));
+			const FGameplayTag Lean_Left_Tag    = FGameplayTag::RequestGameplayTag(FName("Status.Cover.CanLeanLeft"));
+			const FGameplayTag Lean_Right_Tag   = FGameplayTag::RequestGameplayTag(FName("Status.Cover.CanLeanRight"));
+
+			if (ASC->HasMatchingGameplayTag(ADS_Tag)
+				|| ASC->HasMatchingGameplayTag(Lean_Generic_Tag)
+				|| ASC->HasMatchingGameplayTag(Lean_Left_Tag)
+				|| ASC->HasMatchingGameplayTag(Lean_Right_Tag))
+			{
+				bShouldLockYaw = false;
+			}
+		}
+
+		if (bShouldLockYaw)
+		{
+			const FRotator WallAwayRotation = UKismetMathLibrary::MakeRotFromX(-CoverSurfaceNormal);
+			FRotator LockedRotation         = UpdatedComponent->GetComponentRotation();
+			LockedRotation.Yaw              = WallAwayRotation.Yaw;
+			UpdatedComponent->SetWorldRotation(LockedRotation);
+		}
 	}
 }
 

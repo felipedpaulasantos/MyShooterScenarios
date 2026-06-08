@@ -41,6 +41,7 @@ BP_AutoCoverComponent
   │          3. Perpendicular line trace → snap to HitPoint + Normal * DistFromWall
   │          4. Apply gravity + floor sweep (Z axis)
   │          5. SafeMoveUpdatedComponent(FinalDelta, sweep=true)
+  │          6. Rotation lock (enforce wall-perpendicular yaw; skip if ADS/lean tags active)
   │
   │  Lean / Edge detection (unchanged owner, improved trace anchor):
   ├─► Line trace START = GetActorLocation() ± CoverSurfaceTangent * EdgeDist
@@ -149,6 +150,14 @@ public:
     UPROPERTY(BlueprintReadOnly, Transient, Category = "Cover State")
     TObjectPtr<UPrimitiveComponent> CoverComponent = nullptr;
 
+private:
+    /**
+     * Cached value of ACharacter::bUseControllerRotationYaw before entering cover.
+     * Restored verbatim on ExitCoverMode so we don't permanently change the character's
+     * rotation settings.
+     */
+    bool bCachedControllerRotationYaw = true;
+
 // --- CMC overrides ---
 protected:
     virtual void PhysCustom(float DeltaTime, int32 Iterations) override;
@@ -177,7 +186,33 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
     CoverMaxMoveSpeed     = MaxSpeed;
     CoverComponent        = WallHit.GetComponent();
 
-    // Rotate character to face away from the cover wall.
+    // -----------------------------------------------------------------------
+    // ENTRY POSITION CORRECTION
+    // If the character approached the wall at an angle the capsule may be at
+    // the wrong perpendicular distance.  Project the current XY location onto
+    // the wall plane and place the character exactly CoverDistanceFromWall away.
+    // This eliminates the one-frame positional jitter on sideways entries.
+    // -----------------------------------------------------------------------
+    {
+        const FVector CharLoc       = CharacterOwner->GetActorLocation();
+        const FVector ImpactPoint   = WallHit.ImpactPoint;
+        const float   CurrentPerp   = FVector::DotProduct(CharLoc - ImpactPoint, WallHit.Normal);
+        const float   PerpError     = CurrentPerp - CoverDistanceFromWall;
+        const FVector CorrectedLoc  = CharLoc - WallHit.Normal * PerpError;
+        CharacterOwner->SetActorLocation(CorrectedLoc, false, nullptr, ETeleportType::TeleportPhysics);
+    }
+
+    // -----------------------------------------------------------------------
+    // ROTATION LOCK SETUP
+    // Disable controller-yaw so the camera can rotate freely while PhysCustom
+    // enforces the wall-perpendicular yaw each tick.  Cached so ExitCoverMode
+    // can restore the original value rather than hard-coding true/false.
+    // -----------------------------------------------------------------------
+    bCachedControllerRotationYaw         = CharacterOwner->bUseControllerRotationYaw;
+    CharacterOwner->bUseControllerRotationYaw = false;
+
+    // Snap rotation immediately so the character's back faces the wall on the
+    // exact frame cover mode is entered (PhysCustom enforces it every tick after).
     const FRotator FaceAwayFromWall = UKismetMathLibrary::MakeRotFromX(-CoverSurfaceNormal);
     CharacterOwner->SetActorRotation(FaceAwayFromWall);
 
@@ -194,6 +229,12 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
 ```cpp
 void ULyraCharacterMovementComponent::ExitCoverMode()
 {
+    // Restore controller-yaw rotation to whatever it was before cover was entered.
+    if (CharacterOwner)
+    {
+        CharacterOwner->bUseControllerRotationYaw = bCachedControllerRotationYaw;
+    }
+
     CoverSurfaceNormal    = FVector::ZeroVector;
     CoverSurfaceTangent   = FVector::ZeroVector;
     CoverDistanceFromWall = 50.0f;
@@ -235,6 +276,7 @@ This is the core of the feature. It handles:
 - Lateral movement constrained to `CoverSurfaceTangent`
 - Perpendicular snap via a wall trace every step
 - Gravity and floor contact
+- Rotation lock (character's back always faces wall, except when ADSing or leaning)
 
 ```cpp
 void ULyraCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iterations)
@@ -330,6 +372,45 @@ void ULyraCharacterMovementComponent::PhysCustom(float DeltaTime, int32 Iteratio
         // Let the character slide along walls/corners without exiting cover.
         SlideAlongSurface(MoveDelta, 1.0f - MoveHit.Time, MoveHit.Normal, MoveHit, true);
     }
+
+    // -----------------------------------------------------------------------
+    // 5. ROTATION LOCK: enforce wall-perpendicular yaw every tick.
+    //    CoverSurfaceNormal is already refreshed from the live wall trace above
+    //    (step 2), so curved surfaces are handled automatically.
+    //    Only Yaw is forced — Pitch and Roll remain at their CMC defaults (0).
+    //
+    //    EXCEPTION: skip the lock when ADSing or leaning — in those states the
+    //    character needs to rotate freely with the camera for aiming.
+    // -----------------------------------------------------------------------
+    if (CharacterOwner && !CoverSurfaceNormal.IsNearlyZero())
+    {
+        bool bShouldLockYaw = true;
+
+        // Check for ADS or lean tags — if any are present, allow free rotation.
+        if (UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(CharacterOwner))
+        {
+            const FGameplayTag ADS_Tag          = FGameplayTag::RequestGameplayTag(FName("Event.Movement.ADS"));
+            const FGameplayTag Lean_Generic_Tag = FGameplayTag::RequestGameplayTag(FName("Status.Cover.CanLean"));
+            const FGameplayTag Lean_Left_Tag    = FGameplayTag::RequestGameplayTag(FName("Status.Cover.CanLeanLeft"));
+            const FGameplayTag Lean_Right_Tag   = FGameplayTag::RequestGameplayTag(FName("Status.Cover.CanLeanRight"));
+
+            if (ASC->HasMatchingGameplayTag(ADS_Tag)
+                || ASC->HasMatchingGameplayTag(Lean_Generic_Tag)
+                || ASC->HasMatchingGameplayTag(Lean_Left_Tag)
+                || ASC->HasMatchingGameplayTag(Lean_Right_Tag))
+            {
+                bShouldLockYaw = false;
+            }
+        }
+
+        if (bShouldLockYaw)
+        {
+            const FRotator WallAwayRotation = UKismetMathLibrary::MakeRotFromX(-CoverSurfaceNormal);
+            FRotator LockedRotation         = UpdatedComponent->GetComponentRotation();
+            LockedRotation.Yaw              = WallAwayRotation.Yaw;
+            UpdatedComponent->SetWorldRotation(LockedRotation);
+        }
+    }
 }
 ```
 
@@ -388,8 +469,8 @@ The trace **direction** stays the same (perpendicular to the wall). Only the sta
 |---|---|---|
 | `LyraGameplayTags.h` | C++ | +1 tag extern: `Movement_Mode_Cover` |
 | `LyraGameplayTags.cpp` | C++ | +1 tag define; add `{0, Movement_Mode_Cover}` to `CustomMovementModeTagMap` |
-| `LyraCharacterMovementComponent.h` | C++ | +5 state fields, +3 functions (`EnterCoverMode`, `ExitCoverMode`, `IsInCoverMode`), +`PhysCustom` override, update `GetMaxSpeed` comment |
-| `LyraCharacterMovementComponent.cpp` | C++ | Implement all 5 new functions |
+| `LyraCharacterMovementComponent.h` | C++ | +6 state fields (including `bCachedControllerRotationYaw`), +3 functions (`EnterCoverMode`, `ExitCoverMode`, `IsInCoverMode`), +`PhysCustom` override, update `GetMaxSpeed` comment |
+| `LyraCharacterMovementComponent.cpp` | C++ | Implement all functions with entry position correction, controller yaw cache/restore, and rotation lock with ADS/lean exception |
 | `BP_AutoCoverComponent` | Blueprint | Call `EnterCoverMode` / `ExitCoverMode`; remove shoulder-trace direction from `MoveInCover`; fix lean trace anchor |
 
 ---
@@ -404,13 +485,17 @@ The trace **direction** stays the same (perpendicular to the wall). Only the sta
 
 Because `PhysCustom` refreshes `CoverSurfaceNormal` and `CoverSurfaceTangent` from the live wall re-trace each step (see step 2), curved surfaces are handled automatically. The stored surface data adapts every physics tick as the character slides along the curve.
 
-### Jump-Into-Cover Snap
+### Sideways Entry / Jump-Into-Cover Snap
 
-On the very first frame after `EnterCoverMode`, the perpendicular snap in `PhysCustom` immediately corrects any slight misalignment from the initial hit result (e.g. the character was 2cm too far because of capsule resolution). This is the "entry clamp" the current BP system lacks.
+`EnterCoverMode` now includes an **entry position correction** step that projects the character's current location onto the wall plane and teleports it to exactly `CoverDistanceFromWall` perpendicular distance. This ensures that characters entering cover from any angle (sideways, diagonal, or straight-on) snap to the correct position on the first frame, eliminating misalignment artifacts.
+
+Additionally, the rotation lock in `EnterCoverMode` ensures the character's back immediately faces the wall regardless of the approach angle, and `PhysCustom` step 5 maintains this orientation every tick (unless ADSing/leaning).
 
 ### Rotation During Cover
 
-`ALyraCharacter` already sets `bOrientRotationToMovement = false` and uses controller-desired rotation. Since `EnterCoverMode` sets the actor rotation once to face away from the wall, and `PhysCustom` never changes rotation, the camera can still rotate freely (for aiming/leaning) without fighting the CMC. No additional changes needed.
+The `PhysCustom` rotation lock (step 5) enforces wall-perpendicular yaw every tick **except** when the character is ADSing or leaning. During neutral cover state, the character's back always faces the wall. When ADSing or leaning (detected via GAS tags `Event.Movement.ADS`, `Status.Cover.CanLean*`), the yaw lock is bypassed and the character can rotate freely with the camera for precise aiming.
+
+`bUseControllerRotationYaw` is disabled on `EnterCoverMode` and restored on `ExitCoverMode`, ensuring the CMC's rotation lock doesn't fight with the controller's rotation updates during ADS/lean states.
 
 ### `Movement.Mode.Cover` GAS Tag — Free Bonus
 

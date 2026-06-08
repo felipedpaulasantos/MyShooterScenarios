@@ -125,6 +125,14 @@ public:
 	UPROPERTY(BlueprintReadOnly, Transient, Category = "Cover State")
 	TObjectPtr<UPrimitiveComponent> CoverComponent = nullptr;
 
+private:
+	/**
+	 * Cached value of ACharacter::bUseControllerRotationYaw before entering cover.
+	 * Restored verbatim on ExitCoverMode so we don't permanently change the character's
+	 * rotation settings.
+	 */
+	bool bCachedControllerRotationYaw = true;
+
 protected:
 
 	virtual void InitializeComponent() override;
