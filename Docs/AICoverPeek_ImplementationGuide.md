@@ -79,6 +79,7 @@ The system gives each AI three behaviours — **find cover**, **stay in cover**,
 | `HasSeenPlayer` | Bool | `BTService_PlayerPerception` | Sight stimulus received; decays after `LostSightCooldown` s |
 | `HasHeardPlayer` | Bool | `BTService_PlayerPerception` | Qualifying noise received; decays after `LostHearingCooldown` s |
 | `HasEngagedPlayer` | Bool | Custom | — |
+| `IsInCoverMode` | Bool | `UBTTask_EnterCover` / `UBTTask_ExitCover` | Set when AI enters cover via CMC, cleared on exit |
 | `OutOfAmmo` | Bool | `BTService_AIStateObserver` | AI ASC has `Event.Movement.Reload` tag |
 | `HasTakenDamageRecently` | Bool | `BTService_AIStateObserver` | Health dropped ≥ threshold; auto-clears after `DamageCooldown` s |
 | `TargetIsReloading` | Bool | `BTService_AIStateObserver` | Target ASC has `Event.Movement.Reload` tag |
@@ -113,6 +114,9 @@ The system gives each AI three behaviours — **find cover**, **stay in cover**,
 | `UMYSTCoverClaimSubsystem` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | WorldSubsystem tracking which cover spots are claimed |
 | `UMYSTEnvQueryTest_ClaimedSpot` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | EQS test: filters points claimed by other AIs |
 | `UBTTask_FindPeekLocation` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Samples strafe positions from cover, NavProjects, LOS-traces, writes `PeekLocation` |
+| `UBTTask_EnterCover` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Atomic cover entry: claims spot, moves AI, traces wall, calls `EnterCoverMode()`. Includes stabilization delay to prevent decorator feedback loops |
+| `UBTTask_ExitCover` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Exits cover mode, retreats from wall, releases claim |
+| `UBTTask_PeekFromCover` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Integrated peek: strafes to peek location, activates ADS, holds position |
 | `UBTService_PlayerPerception` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Delegate-driven perception (sight/hearing/damage); writes `HasSeenPlayer`, `HasHeardPlayer`, `TargetEnemy`, `LastKnownLocation` |
 | `UBTService_AIStateObserver` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Polls GAS tags; delegate-driven damage arming; writes `OutOfAmmo`, `HasTakenDamageRecently`, `TargetIsReloading`, `TargetIsLowHealth` |
 | `UBTService_PeekWillingness` | `MyShooterFeaturePluginRuntime` | `Public/AI/` | Aggregates all state keys into `PeekWillingnessScore` [0–1] |
@@ -121,8 +125,8 @@ Blueprint-only (no C++ replacement needed):
 
 | Asset | Role |
 |---|---|
-| `BTT_ClaimCoverSpot` (BP) | Calls `UMYSTCoverClaimSubsystem::ClaimSpot` |
-| `BTT_ReleaseCoverSpot` (BP) | Calls `UMYSTCoverClaimSubsystem::ReleaseSpot` |
+| `BTT_ClaimCoverSpot` (BP) | *Deprecated* — use `UBTTask_EnterCover` C++ task instead |
+| `BTT_ReleaseCoverSpot` (BP) | *Deprecated* — use `UBTTask_ExitCover` C++ task instead |
 
 ---
 
@@ -363,34 +367,67 @@ Root
     ├── [Service] BTService_AIStateObserver          ← tick third
     ├── [Service] BTService_PeekWillingness          ← tick last (reads outputs of all three)
     │
-    ├── Sequence  [PEEK & SHOOT]                     HIGH priority
-    │   ├── Decorator: BB  TargetEnemy != null            AbortSelf+LowerPriority
-    │   ├── Decorator: BB  HasSeenPlayer == true           AbortSelf+LowerPriority
-    │   ├── Decorator: BB  PeekWillingnessScore >= 0.35   AbortSelf+LowerPriority ◄ reactive gate
-    │   ├── Decorator: BB  OutOfAmmo == false              AbortSelf
-    │   ├── Decorator: BB  HasTakenDamageRecently == false AbortSelf
-    │   ├── BTTask_FindPeekLocation
+    ├── Sequence  [PEEK FROM COVER]                  HIGH priority
+    │   ├─ Decorator: BB  IsInCoverMode == true           (AbortBoth)
+    │   ├─ Decorator: BB  TargetEnemy != null              (AbortBoth)
+    │   ├─ Decorator: BB  PeekWillingnessScore >= 0.35    (AbortSelf+LowerPriority)
+    │   ├─ Decorator: BB  OutOfAmmo == false               (AbortSelf)
+    │   ├─ Decorator: BB  HasTakenDamageRecently == false  (AbortSelf)
+    │   ├─ BTTask_FindPeekLocation                         ← samples strafe positions
     │   │     CoverLocationKey → CoverLocation
     │   │     TargetActorKey   → TargetEnemy
     │   │     PeekLocationKey  → PeekLocation
-    │   ├── MoveTo (PeekLocation)
-    │   └── BTTask_TryUseAbility  [Fire ability tag]
+    │   └─ BTTask_PeekFromCover                            ← NEW: integrated strafe + ADS
+    │        PeekLocationKey → PeekLocation
+    │        TargetActorKey  → TargetEnemy
+    │        ADSAbilityTag   → Ability.Type.Action.ADS
+    │        ADSHoldDuration → 2.0s
     │
-    └── Sequence  [TAKE COVER]                       LOW priority (fallback)
-        [Service] BTS_CoverClaimLifetime
-        ├── RunEQSQuery → CoverLocation
-        │     (EQS_FindCover + UMYSTEnvQueryTest_ClaimedSpot)
-        ├── MoveTo (CoverLocation)
-        └── Wait (0.1 s)        ← prevents EQS from hammering every frame
+    ├── Sequence  [ENTER COVER]                      MID priority
+    │   ├─ Decorator: BB  TargetEnemy != null             (AbortBoth)
+    │   ├─ Decorator: BB  HasSeenPlayer == true            (AbortBoth)
+    │   ├─ Decorator: BB  IsInCoverMode == false           (AbortBoth, inverse guard)
+    │   ├─ RunEQSQuery → CoverLocation
+    │   │     (EQS_FindCover + UMYSTEnvQueryTest_ClaimedSpot)
+    │   └─ BTTask_EnterCover                               ← NEW: atomic claim + move + glue
+    │        CoverLocationKey  → CoverLocation
+    │        IsInCoverModeKey  → IsInCoverMode
+    │        CoverMaxSpeed     → 250
+    │
+    └── Sequence  [PATROL / IDLE]                    LOW priority (fallback)
+        └─ ...existing patrol logic
 ```
 
 ### How return-to-cover works (no extra C++ needed)
 
-When `OutOfAmmo` or `HasTakenDamageRecently` flips `true` mid-peek, the `AbortSelf` Decorators on the Peek Sequence fire immediately. The Selector falls through to the **TAKE COVER** branch, which runs `MoveTo(CoverLocation)`. Once the reload finishes and the damage cooldown expires, the Decorators re-allow the Peek Sequence and the cycle repeats.
+When `OutOfAmmo` or `HasTakenDamageRecently` flips `true` mid-peek, the `AbortSelf` Decorators on the Peek Sequence fire immediately. The AI stops peeking but **stays in cover** (the `IsInCoverMode` decorator on the Peek Sequence is `AbortBoth`, so the sequence aborts but the cover state remains). Once the reload finishes and the damage cooldown expires, the Decorators re-allow the Peek Sequence and the cycle repeats.
+
+### Exit Cover Flow
+
+To force the AI to exit cover, add a dedicated exit branch with your desired exit conditions:
+
+```
+├── Sequence  [EXIT COVER]                          LOWEST priority
+    ├─ Decorator: BB  IsInCoverMode == true
+    ├─ Decorator: CUSTOM (e.g., no targets for 10s, or critically low health)
+    └─ BTTask_ExitCover
+         IsInCoverModeKey → IsInCoverMode
+         RetreatDistance  → 150
+```
 
 ---
 
 ## Editor Setup Checklist
+
+### 0. Tag Your Cover Meshes (Required for AI)
+
+**Before using `BTTask_EnterCover`**, ensure all cover meshes in your level are tagged:
+
+1. Select the cover mesh/actor in the level
+2. In Details panel → **Tags** section
+3. Add an **Actor Tag** named `Cover` (or add it to Component Tags on the mesh component)
+
+Without this tag, the AI's wall trace will reject the surface (preventing incorrect cover on ground/walls/etc.).
 
 ### 1. Add missing BB keys to `BB_ShooterAI`
 
@@ -403,6 +440,8 @@ Open `BB_ShooterAI` → **New Key** for each:
 | `TargetIsReloading` | Bool |
 | `TargetIsLowHealth` | Bool |
 | `PeekWillingnessScore` | Float |
+| `IsInCoverMode` | Bool |
+| `PeekLocation` | Vector |
 
 ### 2. Configure `BTService_PlayerPerception` on the Combat Selector
 
@@ -450,77 +489,63 @@ Leave `ScoreWriteDeadBand` at `0.02` unless you have a specific reason to change
 
 | Decorator | Key | Condition | Observer Aborts |
 |---|---|---|---|
+| Blackboard | `IsInCoverMode` | Is Set / == true | Both |
 | Blackboard | `TargetEnemy` | Is Set | Both |
-| Blackboard | `HasSeenPlayer` | Is Set / == true | Both |
 | Blackboard | `PeekWillingnessScore` | Float >= `0.35` | Both |
 | Blackboard | `OutOfAmmo` | Is Not Set / == false | Self |
 | Blackboard | `HasTakenDamageRecently` | Is Not Set / == false | Self |
 
-### 6. Verify `BTT_ReleaseCoverSpot` fires on abort
+### 6. Add BT Tasks to sequences
 
-In the BT editor, confirm the BP task fires when the **TAKE COVER** Sequence is interrupted — not only when it succeeds. The recommended pattern is an **On Abort** service or a **Decorator On Abort** that calls `ReleaseSpot(SelfActor)`. Without this, the `UMYSTCoverClaimSubsystem` will accumulate ghost claims for dead or fleeing AIs.
+**ENTER COVER Sequence:**
+1. Add `RunEQSQuery` → select `EQS_FindCover`, result to `CoverLocation`
+2. Add `BTTask_EnterCover`:
+   - `CoverLocationKey` → `CoverLocation`
+   - `IsInCoverModeKey` → `IsInCoverMode`
+   - `CoverMaxSpeed` → `250`
+
+**PEEK FROM COVER Sequence:**
+1. Add `BTTask_FindPeekLocation`:
+   - `CoverLocationKey` → `CoverLocation`
+   - `TargetActorKey` → `TargetEnemy`
+   - `PeekLocationKey` → `PeekLocation`
+2. Add `BTTask_PeekFromCover`:
+   - `PeekLocationKey` → `PeekLocation`
+   - `TargetActorKey` → `TargetEnemy`
+   - `ADSAbilityTag` → `Ability.Type.Action.ADS`
+   - `ADSHoldDuration` → `2.0`
+
+**Optional EXIT COVER Sequence** (if you want explicit exit logic):
+1. Add decorators for exit conditions (e.g., no targets for X seconds, critically low health)
+2. Add `BTTask_ExitCover`:
+   - `IsInCoverModeKey` → `IsInCoverMode`
+   - `RetreatDistance` → `150`
 
 ---
 
-## Wiring Release on Abort: `BTS_CoverClaimLifetime`
+## ~~Wiring Release on Abort: `BTS_CoverClaimLifetime`~~ (Deprecated)
 
-### Why tasks alone are not enough
+> **Note:** This section describes the **old Blueprint-based approach** for claim management. The new **`UBTTask_EnterCover`** and **`UBTTask_ExitCover`** C++ tasks handle claiming/releasing atomically and automatically handle abort cleanup. You **do not** need to create `BTS_CoverClaimLifetime` if using the new tasks.
+>
+> This section is preserved for reference only if you have legacy BT graphs using the old `BTT_ClaimCoverSpot` / `BTT_ReleaseCoverSpot` Blueprint tasks.
 
-`BTT_ClaimCoverSpot` returns `Success` and the Sequence moves on to `MoveTo`. If the Peek Willingness Decorator then aborts the Sequence, the BT kills `MoveTo` (the currently running node). `BTT_ClaimCoverSpot` already finished — its abort event **never fires**. `BTT_ReleaseCoverSpot` as a downstream task **never runs** either. The claim leaks.
+### Why tasks alone were not enough (old approach)
 
-### The fix: a BTService on the Sequence node
+`BTT_ClaimCoverSpot` returned `Success` and the Sequence moved on to `MoveTo`. If the Peek Willingness Decorator then aborted the Sequence, the BT killed `MoveTo` (the currently running node). `BTT_ClaimCoverSpot` already finished — its abort event **never fired**. `BTT_ReleaseCoverSpot` as a downstream task **never ran** either. The claim leaked.
 
-A **BTService** attached to a node fires `Event Receive Deactivation` when that node stops being relevant — on **both normal completion and abort**. This is the standard UE5 cleanup pattern.
+### The old fix: a BTService on the Sequence node
 
-### Creating `BTS_CoverClaimLifetime` (Blueprint)
+A **BTService** attached to a node fired `Event Receive Deactivation` when that node stopped being relevant — on **both normal completion and abort**. This was the standard UE5 cleanup pattern for Blueprint tasks that didn't handle their own abort cleanup.
 
-**1.** Create a new Blueprint class inheriting `BTService`. Name it `BTS_CoverClaimLifetime`.
+### Migration to new C++ tasks
 
-**2.** Set `Interval = 0` and uncheck **Call Tick on Search Start** — no ticking needed.
+Replace:
+- `BTS_CoverClaimLifetime` service + `BTT_ClaimCoverSpot` task → **`UBTTask_EnterCover`** (single atomic task)
+- `BTT_ReleaseCoverSpot` task → **`UBTTask_ExitCover`** (or rely on `UBTTask_EnterCover`'s abort cleanup)
 
-**3.** Implement two events:
+The new tasks handle claim/release in their `AbortTask()` override, so no separate service is needed.
 
-```
-Event Receive Activation AI
-  └─► GetWorldSubsystem (UMYSTCoverClaimSubsystem)
-        └─► ClaimSpot(
-              Location = GetBlackboardValueAsVector[CoverLocation],
-              Claimer  = Controlled Pawn,
-              Radius   = 150.0
-            )
-
-Event Receive Deactivation AI          ← fires on SUCCESS and ABORT
-  └─► GetWorldSubsystem (UMYSTCoverClaimSubsystem)
-        └─► ReleaseSpot(Claimer = Controlled Pawn)
-```
-
-**4.** In the BT, **drag the service onto the TAKE COVER Sequence header** (not into a child slot). Remove `BTT_ClaimCoverSpot` from inside the Sequence — the service's activation now handles claiming.
-
-```
-Sequence  [TAKE COVER]
-  [Service] BTS_CoverClaimLifetime   ← Activation=Claim, Deactivation=Release
-  ├── RunEQSQuery → CoverLocation
-  ├── MoveTo (CoverLocation)
-  └── Wait (0.1 s)
-```
-
-### Alternative: keep the existing BP tasks, add a thin service
-
-If `BTT_ClaimCoverSpot` is reused elsewhere, keep it as a task and add a minimal service that only handles the release:
-
-**1.** Create `BTS_ReleaseCoverOnExit` Blueprint BTService.
-
-**2.** Implement only:
-```
-Event Receive Deactivation AI
-  └─► GetWorldSubsystem (UMYSTCoverClaimSubsystem)
-        └─► ReleaseSpot(Controlled Pawn)
-```
-
-**3.** Attach it to the TAKE COVER Sequence. `BTT_ClaimCoverSpot` stays as a task inside.
-
-```
-Sequence  [TAKE COVER]
+---
   [Service] BTS_ReleaseCoverOnExit   ← only handles release on exit/abort
   ├── RunEQSQuery → CoverLocation
   ├── BTT_ClaimCoverSpot  (BP)       ← still claims on task execution

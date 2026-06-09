@@ -208,7 +208,7 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
 			ResolvedImpactPoint + LocalTangent * RequiredHalfWidth
 		};
 
-		for (const FVector& ProbeOrigin : ProbeOrigins)
+		/*for (const FVector& ProbeOrigin : ProbeOrigins)
 		{
 			// Trace through the wall plane at this offset point.
 			const FVector ProbeStart = ProbeOrigin + ResolvedNormal * 80.0f;
@@ -222,7 +222,7 @@ void ULyraCharacterMovementComponent::EnterCoverMode(const FHitResult& WallHit, 
 				// Surface edge or corner within required width — too narrow.
 				return;
 			}
-		}
+		}*/
 	}
 
 	// Store surface data — never updated from animations.
