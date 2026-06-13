@@ -25,7 +25,7 @@
  *  - Stops issuing movement input (natural — no explicit stop needed).
  *
  * ── Setup ──────────────────────────────────────────────────────────────────
- *  - Wire TargetEnemyKey to the Object BB key holding the player/enemy.
+ *  - Wire MoveGoalKey to the Vector BB key holding the cover-edge position.
  *  - Tune StrafeSpeedScale and StrafeTimeout as needed.
  *  - ADS is handled separately — this task does NOT activate it.
  */
@@ -50,21 +50,21 @@ protected:
 	// ── Blackboard Keys ─────────────────────────────────────────────────────
 
 	/**
-	 * Object key holding the target enemy actor (the player).
-	 * Used to determine which direction along the cover to strafe.
+	 * Vector key holding the world-space position of the cover edge to strafe toward.
+	 * Replaces the former TargetEnemyKey — decouple move goal from the enemy actor.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Blackboard")
-	FBlackboardKeySelector TargetEnemyKey;
+	FBlackboardKeySelector MoveGoalKey;
 
 	// ── Tuning Parameters ───────────────────────────────────────────────────
 
 	/**
 	 * Lateral movement speed scale (0–1) applied to AddMovementInput during strafe.
-	 * Lower values = slower, more cautious peek movement.
+	 * Defaults to 1.0 for immediate, full-speed movement toward the cover edge.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Peek",
 		meta = (ClampMin = "0.1", ClampMax = "1.0"))
-	float StrafeSpeedScale = 0.6f;
+	float StrafeSpeedScale = 1.0f;
 
 	/**
 	 * Maximum time (s) to strafe before giving up.

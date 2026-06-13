@@ -7,6 +7,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Object.h"
+#include "BehaviorTree/Blackboard/BlackboardKeyType_Vector.h"
 #include "Character/LyraCharacterMovementComponent.h"
 #include "DrawDebugHelpers.h"
 #include "GameFramework/Character.h"
@@ -24,7 +25,7 @@ UBTTask_PeekFromCover::UBTTask_PeekFromCover(const FObjectInitializer& ObjectIni
 	bNotifyTick = true;
 	bNotifyTaskFinished = true;
 
-	TargetEnemyKey.AddObjectFilter(this, GET_MEMBER_NAME_CHECKED(UBTTask_PeekFromCover, TargetEnemyKey), AActor::StaticClass());
+	MoveGoalKey.AddVectorFilter(this, GET_MEMBER_NAME_CHECKED(UBTTask_PeekFromCover, MoveGoalKey));
 }
 
 EBTNodeResult::Type UBTTask_PeekFromCover::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
@@ -50,10 +51,11 @@ EBTNodeResult::Type UBTTask_PeekFromCover::ExecuteTask(UBehaviorTreeComponent& O
 		return EBTNodeResult::Failed;
 	}
 
-	AActor* TargetEnemy = Cast<AActor>(BB->GetValueAsObject(TargetEnemyKey.SelectedKeyName));
-	if (!TargetEnemy)
+	// Fetch the cover-edge move goal from the blackboard (Vector key).
+	const FVector MoveGoal = BB->GetValueAsVector(MoveGoalKey.SelectedKeyName);
+	if (MoveGoal.IsZero())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("BTTask_PeekFromCover [%s]: No TargetEnemy in blackboard — failing."), *GetNameSafe(AIPawn));
+		UE_LOG(LogTemp, Warning, TEXT("BTTask_PeekFromCover [%s]: MoveGoal blackboard key is zero/unset — failing."), *GetNameSafe(AIPawn));
 		return EBTNodeResult::Failed;
 	}
 
@@ -64,10 +66,10 @@ EBTNodeResult::Type UBTTask_PeekFromCover::ExecuteTask(UBehaviorTreeComponent& O
 	}
 
 	// ── Cache strafe direction ONCE ──────────────────────────────────────────
-	// Project the 2-D direction toward the enemy onto the cover surface tangent.
+	// Project the 2-D direction toward the move goal onto the cover surface tangent.
 	// The sign determines which side to strafe toward; caching it prevents
 	// sign oscillation as the dot product changes during movement.
-	FVector ToEnemy2D = TargetEnemy->GetActorLocation() - AIPawn->GetActorLocation();
+	FVector ToEnemy2D = MoveGoal - AIPawn->GetActorLocation();
 	ToEnemy2D.Z = 0.f;
 
 	const float DotToTangent = FVector::DotProduct(ToEnemy2D.GetSafeNormal(), CMC->CoverSurfaceTangent);
@@ -79,7 +81,7 @@ EBTNodeResult::Type UBTTask_PeekFromCover::ExecuteTask(UBehaviorTreeComponent& O
 	Memory->StartTime = World->GetTimeSeconds();
 	Memory->CachedStrafeDir = CMC->CoverSurfaceTangent * (StrafeSign != 0.f ? StrafeSign : 1.f);
 
-	UE_LOG(LogTemp, Log, TEXT("BTTask_PeekFromCover [%s]: Starting strafe. CachedStrafeDir=%s  Tangent=%s  DotToTangent=%.2f"),
+	UE_LOG(LogTemp, Log, TEXT("BTTask_PeekFromCover [%s]: Starting strafe toward MoveGoal. CachedStrafeDir=%s  Tangent=%s  DotToTangent=%.2f"),
 		*GetNameSafe(AIPawn),
 		*Memory->CachedStrafeDir.ToString(),
 		*CMC->CoverSurfaceTangent.ToString(),
@@ -99,6 +101,13 @@ void UBTTask_PeekFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* N
 
 	APawn* AIPawn = AIController->GetPawn();
 	if (!AIPawn)
+	{
+		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+		return;
+	}
+	
+	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
+	if (!AIController || !BB)
 	{
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
 		return;
@@ -123,15 +132,17 @@ void UBTTask_PeekFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* N
 	}
 
 	// ── Check Status.Cover.CanLean tag ─────────────────────────────────────────────
-	UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(AIPawn);
-	if (ASC && ASC->HasMatchingGameplayTag(CanLeanTag))
-	{
-		UE_LOG(LogTemp, Log, TEXT("BTTask_PeekFromCover [%s]: Status.Cover.CanLean received — peek position reached. Succeeding."),
-			*GetNameSafe(AIPawn));
-		Memory->State = EPeekState::Complete;
-		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
-		return;
-	}
+	// UAbilitySystemComponent* ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(AIPawn);
+	// if (ASC && ASC->HasMatchingGameplayTag(CanLeanTag))
+	// {
+	// 	UE_LOG(LogTemp, Log, TEXT("BTTask_PeekFromCover [%s]: Status.Cover.CanLean received — stopping movement and succeeding."),
+	// 		*GetNameSafe(AIPawn));
+	// 	// Hard-stop lateral momentum so the character doesn't overshoot the cover edge.
+	// 	CMC->StopMovementImmediately();
+	// 	Memory->State = EPeekState::Complete;
+	// 	FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+	// 	return;
+	// }
 
 	// ── Timeout guard ────────────────────────────────────────────────────────
 	const float Elapsed = World->GetTimeSeconds() - Memory->StartTime;
@@ -144,6 +155,14 @@ void UBTTask_PeekFromCover::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* N
 	}
 
 	// ── Drive lateral movement ───────────────────────────────────────────────
+	const FVector CurrentMoveGoal = BB->GetValueAsVector(MoveGoalKey.SelectedKeyName);
+	FVector ToGoal2D = (CurrentMoveGoal - AIPawn->GetActorLocation());
+	ToGoal2D.Z = 0.f;
+	const float LiveDot = FVector::DotProduct(ToGoal2D.GetSafeNormal(), CMC->CoverSurfaceTangent);
+	if (FMath::Abs(LiveDot) > 0.1f)
+	{
+		Memory->CachedStrafeDir = CMC->CoverSurfaceTangent * FMath::Sign(LiveDot);
+	}
 	AIPawn->AddMovementInput(Memory->CachedStrafeDir, StrafeSpeedScale);
 
 #if ENABLE_DRAW_DEBUG
@@ -161,7 +180,7 @@ EBTNodeResult::Type UBTTask_PeekFromCover::AbortTask(UBehaviorTreeComponent& Own
 
 FString UBTTask_PeekFromCover::GetStaticDescription() const
 {
-	return FString::Printf(TEXT("Strafe along cover toward enemy\nStop on: Status.Cover.CanLean  |  Timeout: %.1f s"), StrafeTimeout);
+	return FString::Printf(TEXT("Strafe along cover toward MoveGoal\nStop on: Status.Cover.CanLean  |  Timeout: %.1f s"), StrafeTimeout);
 }
 
 uint16 UBTTask_PeekFromCover::GetInstanceMemorySize() const
