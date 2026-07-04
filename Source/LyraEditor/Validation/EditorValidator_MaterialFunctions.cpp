@@ -85,7 +85,7 @@ EDataValidationResult UEditorValidator_MaterialFunctions::ValidateLoadedAsset_Im
 						{
 							for (const FString& WarningOrError : WarningsAndErrors)
 							{
-								AssetFails(InAsset, FText::FromString(WarningOrError), ValidationErrors);
+											AssetFails(InAsset, FText::FromString(WarningOrError));
 							}
 						}
 						break;

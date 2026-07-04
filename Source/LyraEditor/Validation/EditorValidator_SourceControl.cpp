@@ -50,7 +50,7 @@ EDataValidationResult UEditorValidator_SourceControl::ValidateLoadedAsset_Implem
 					if (DependencyState.IsValid() && !DependencyState->IsSourceControlled() && !DependencyState->IsUnknown())
 					{
 						// The editor doesn't sync state for all assets, so we only want to warn on assets that are known about
-						AssetFails(InAsset, FText::Format(LOCTEXT("SourceControl_NotMarkedForAdd", "References {0} which is not marked for add in source control"), FText::FromString(DependencyStr)), ValidationErrors);
+						AssetFails(InAsset, FText::Format(LOCTEXT("SourceControl_NotMarkedForAdd", "References {0} which is not marked for add in source control"), FText::FromString(DependencyStr)));
 					}
 				}
 			}

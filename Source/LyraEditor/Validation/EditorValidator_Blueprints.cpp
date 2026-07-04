@@ -94,7 +94,7 @@ EDataValidationResult UEditorValidator_Blueprints::ValidateLoadedAsset_Implement
 									{
 										for (const FString& WarningOrError : WarningsAndErrors)
 										{
-											AssetFails(InAsset, FText::FromString(WarningOrError), ValidationErrors);
+																				AssetFails(InAsset, FText::FromString(WarningOrError));
 										}
 									}
 									break;

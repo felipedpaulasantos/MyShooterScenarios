@@ -45,12 +45,12 @@ EDataValidationResult UEditorValidator_Load::ValidateLoadedAsset_Implementation(
 	{
 		for (const FString& WarningOrError : WarningsAndErrors)
 		{
-			AssetFails(InAsset, FText::FromString(WarningOrError), ValidationErrors);
+			AssetFails(InAsset, FText::FromString(WarningOrError));
 		}
 	}
 	else
 	{
-		AssetFails(InAsset, LOCTEXT("Load_FailedLoad", "Failed to get package load warnings and errors"), ValidationErrors);
+		AssetFails(InAsset, LOCTEXT("Load_FailedLoad", "Failed to get package load warnings and errors"));
 	}
 
 	if (GetValidationResult() != EDataValidationResult::Invalid)
